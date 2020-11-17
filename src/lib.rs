@@ -3,6 +3,8 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
 
+// ThreadPool implementation
+
 pub struct ThreadPool {
     workers: Vec<Worker>,
     sender: mpsc::Sender<Message>,
@@ -82,8 +84,8 @@ impl Worker {
             match message {
                 Message::NewJob(job) => {
                     println!("Worker {} got a job; executing.", id);
-
                     job();
+                    println!("Worker {} finished its job.", id);
                 }
                 Message::Terminate => {
                     println!("Worker {} was told to terminate.", id);
@@ -99,3 +101,18 @@ impl Worker {
         }
     }
 }
+
+// TODO List
+
+// * HTTP Post/Get
+// * Upload
+// * Download
+// * HTTP分块传输
+// * 支持HTTP持久连接和管道
+
+// TODO
+
+// Use lib to deal with HTTPS Request
+
+// TODO
+// openssl or others?
