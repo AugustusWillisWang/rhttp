@@ -25,7 +25,9 @@ use std::net::TcpStream;
 // use std::thread;
 // use std::time::Duration;
 
-use rhttp::ThreadPool;
+mod tpool;
+use tpool::*;
+
 mod parser; // parser for http head
 use parser::http::*; // import http head data structure
 
