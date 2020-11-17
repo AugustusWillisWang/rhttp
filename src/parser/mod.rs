@@ -1,3 +1,4 @@
 pub mod http;
 
-pub use http::test;
+pub use http::HttpRequestMethod;
+pub use http::HttpRequest;

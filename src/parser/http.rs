@@ -47,9 +47,9 @@ impl<'t> From<&'t str> for HttpRequest<'t> {
     fn from (input: &'t str) -> Self {
         let mut lines = input.lines();
 
-        let mut head_line = match lines.next() {
+        let head_line = match lines.next() {
             Some(line) => line,
-            None => return HttpRequest::invalidRequest(),
+            None => return HttpRequest::invalid_request(),
         };
         let mut head_line_splited = head_line.split(" ");
 
@@ -57,19 +57,19 @@ impl<'t> From<&'t str> for HttpRequest<'t> {
             Some(raw_method) => match raw_method {
                 "GET"  => HttpRequestMethod::GET,
                 "POST" => HttpRequestMethod::POST,
-                _ => return HttpRequest::invalidRequest(),
+                _ => return HttpRequest::invalid_request(),
             },
-            None => return HttpRequest::invalidRequest(),
+            None => return HttpRequest::invalid_request(),
         };
         
         let url = match head_line_splited.next() {
             Some(raw_url) => raw_url,
-            None => return HttpRequest::invalidRequest(),
+            None => return HttpRequest::invalid_request(),
         };
         
         let version = match head_line_splited.next() {
             Some(raw_version) => raw_version,
-            None => return HttpRequest::invalidRequest(),
+            None => return HttpRequest::invalid_request(),
         };
    
         // println!("http head parse result: {}", result);
@@ -85,7 +85,7 @@ impl<'t> From<&'t str> for HttpRequest<'t> {
 }
 
 impl HttpRequest<'_> {
-    fn invalidRequest() -> Self {
+    fn invalid_request() -> Self {
         HttpRequest {
             method: HttpRequestMethod::ILLEGAL,
             url: "",
@@ -95,12 +95,4 @@ impl HttpRequest<'_> {
             head: BTreeMap::new()
         }
     }
-}
-
-pub fn test(){
-    println!("HttpParser imported");
-}
-
-pub fn parse_http_head(input: &str) -> Result<HttpRequest, &'static str> {
-    Ok(HttpRequest::from(input))
 }
