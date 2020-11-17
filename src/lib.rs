@@ -101,18 +101,3 @@ impl Worker {
         }
     }
 }
-
-// TODO List
-
-// * HTTP Post/Get
-// * Upload
-// * Download
-// * HTTP分块传输
-// * 支持HTTP持久连接和管道
-
-// TODO
-
-// Use lib to deal with HTTPS Request
-
-// TODO
-// openssl or others?
