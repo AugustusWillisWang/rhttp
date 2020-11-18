@@ -22,7 +22,7 @@ pub struct HttpRequest<'t> {
     pub version: &'t str, // use reference to avoid copying
     // pub raw_head: &'t str,
     // pub raw_body: &'t str,
-    pub header: BTreeMap<String, &'t str>, // Other fields in head, if necessary
+    pub headers: BTreeMap<String, &'t str>, // Other fields in head, if necessary
     pub body: std::str::Lines<'t>,
     
     // ref: https://stackoverflow.com/questions/41034635/idiomatic-transformations-for-string-str-vecu8-and-u8
@@ -36,7 +36,7 @@ impl fmt::Display for HttpRequest<'_> {
             // HttpRequestMethod::POST => "POST",
             _ => "ILLEGAL"
         };
-        write!(f, "HttpRequest:\nmethod {}\nurl {}\nversion {}\nheader {:#?}\nbody {:#?}", req_type, self.url, self.version, self.header, self.body)
+        write!(f, "HttpRequest:\nmethod {}\nurl {}\nversion {}\nheaders {:#?}\nbody {:#?}", req_type, self.url, self.version, self.headers, self.body)
     }
 }
 
@@ -50,13 +50,13 @@ impl<'t> From<&'t str> for HttpRequest<'t> {
     fn from (input: &'t str) -> Self {
         let mut lines = input.lines();
         
-        let head_line = match lines.next() {
+        let start_line = match lines.next() {
             Some(line) => line,
             None => return HttpRequest::invalid_request(),
         };
-        let mut head_line_splited = head_line.split(" ");
+        let mut start_line_splited = start_line.split(" ");
         
-        let method = match head_line_splited.next() {
+        let method = match start_line_splited.next() {
             Some(raw_method) => match raw_method {
                 "GET"  => HttpRequestMethod::GET,
                 "POST" => HttpRequestMethod::POST,
@@ -65,36 +65,36 @@ impl<'t> From<&'t str> for HttpRequest<'t> {
             None => return HttpRequest::invalid_request(),
         };
         
-        let url = match head_line_splited.next() {
+        let url = match start_line_splited.next() {
             Some(raw_url) => raw_url,
             None => return HttpRequest::invalid_request(),
         };
         
-        let version = match head_line_splited.next() {
+        let version = match start_line_splited.next() {
             Some(raw_version) => raw_version,
             None => return HttpRequest::invalid_request(),
         };
 
-        let mut header = BTreeMap::<String, &'t str>::new();
+        let mut headers = BTreeMap::<String, &'t str>::new();
 
         // check line by line, do not stop until we can not find valid "k: v" pair
         loop {
             let mut line_splited = lines.next().unwrap_or("").split(":");
             match (line_splited.next(), line_splited.next()) {
                 (Some(k), Some(v)) => {
-                    header.insert(k.trim().to_string(), v.trim());
+                    headers.insert(k.trim().to_string(), v.trim());
                 },
                 _ => break
             }
         }
 
-        // println!("header BT: {:#?}", header);
+        // println!("headers BT: {:#?}", headers);
         // println!("http head parse result: {}", result);
         Self {
             method: method,
             url: url,
             version: version,
-            header: header,
+            headers: headers,
             body: lines
         }
     }
@@ -106,7 +106,7 @@ impl HttpRequest<'_> {
             method: HttpRequestMethod::ILLEGAL,
             url: "",
             version: "",
-            header: BTreeMap::new(),
+            headers: BTreeMap::new(),
             body: "".lines(),
         }
     }
