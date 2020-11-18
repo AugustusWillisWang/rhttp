@@ -4,12 +4,17 @@ use std::fs;
 use std::fmt;
 use std::collections::BTreeMap;
 
+use super::super::BUFFER_SIZE;
+
 // Parse HTTP Request
 
 #[derive(Debug, PartialEq)]
 pub enum HttpRequestMethod {
     GET,
     POST,
+    HEAD,
+    PUT,
+    OPTIONS,
     ILLEGAL, // -> Ignored
 }
 
@@ -25,6 +30,7 @@ pub struct HttpRequest<'t> {
     // pub raw_body: &'t str,
     pub headers: BTreeMap<String, &'t str>, // Other fields in head, if necessary
     pub body: std::str::Lines<'t>,
+    pub size: usize,
     
     // ref: https://stackoverflow.com/questions/41034635/idiomatic-transformations-for-string-str-vecu8-and-u8
     // It talks about trans between vec, u8, str, etc.
@@ -59,8 +65,11 @@ impl<'t> From<&'t str> for HttpRequest<'t> {
         
         let method = match start_line_splited.next() {
             Some(raw_method) => match raw_method {
-                "GET"  => HttpRequestMethod::GET,
-                "POST" => HttpRequestMethod::POST,
+                "GET"     => HttpRequestMethod::GET,
+                "POST"    => HttpRequestMethod::POST,
+                "HEAD"    => HttpRequestMethod::HEAD,
+                "PUT"     => HttpRequestMethod::PUT,
+                "OPTIONS" => HttpRequestMethod::OPTIONS,
                 _ => return HttpRequest::invalid_request(),
             },
             None => return HttpRequest::invalid_request(),
@@ -96,7 +105,8 @@ impl<'t> From<&'t str> for HttpRequest<'t> {
             url: url,
             version: version,
             headers: headers,
-            body: lines
+            body: lines,
+            size: input.chars().count(),
         }
     }
 }
@@ -109,6 +119,7 @@ impl HttpRequest<'_> {
             version: "",
             headers: BTreeMap::new(),
             body: "".lines(),
+            size: 0,
         }
     }
 }
@@ -124,7 +135,7 @@ pub struct HttpResponse<'t> {
     // ref: https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Messages
     pub status_code: u32,
     pub status_text: &'t str,
-    pub headers: BTreeMap<String, &'t str>, // Other fields in head, if necessary
+    pub headers: BTreeMap<String, String>, // Other fields in head, if necessary
     pub body: String,
 }
 
@@ -135,13 +146,32 @@ impl fmt::Display for HttpResponse<'_> {
 }
 
 impl HttpResponse<'_> {
-    fn new_404() -> Self {
-        // for testing only, should not reach here
+
+    // fn error_404() -> Self {
+    //     // for testing only, should not reach here
+    //     Self {
+    //         status_code: 404,
+    //         status_text: "Not Found",
+    //         headers: BTreeMap::<String, &str>::new(),
+    //         body: "404 Not Found".to_string(),
+    //     }
+    // }
+
+    fn error_500() -> Self {
         Self {
-            status_code: 404,
-            status_text: "Undefined Interal Error",
-            headers: BTreeMap::<String, &str>::new(),
+            status_code: 500,
+            status_text: "Internal Server Error",
+            headers: BTreeMap::<String, String>::new(),
             body: "Undefined Interal Error Resp Body".to_string(),
+        }
+    }
+
+    fn error_507() -> Self {
+        Self {
+            status_code: 507,
+            status_text: "Insufficient Storage",
+            headers: BTreeMap::<String, String>::new(),
+            body: "".to_string(),
         }
     }
 
@@ -149,14 +179,14 @@ impl HttpResponse<'_> {
     /// 
     /// Return Ok(HttpResponse) if a response is needed
     /// Return None if no response is required
-    pub fn new(request: &HttpRequest, root_dir: &str) -> Option<Self> {
+    pub fn new(request: &mut HttpRequest, root_dir: &str) -> Option<Self> {
         // let status_code =  404;
         // let status_text = "Undefined Interal Error";
-        let mut headers = BTreeMap::<String, &str>::new();
+        let mut headers = BTreeMap::<String, String>::new();
         // let body = "Undefined Interal Error Resp Body";
         
         // Response Headers
-        headers.insert("Server".to_string(), "rhttp");
+        headers.insert("Server".to_string(), "rhttp".to_string());
         
         // Entity Headers
         // TODO: Content-Type
@@ -177,7 +207,18 @@ impl HttpResponse<'_> {
                 println!("Ignored illegal request");
                 return None
             }
+
             HttpRequestMethod::GET => {
+                // Sending body/payload in a GET request may cause some existing
+                // implementations to reject the request — while not prohibited 
+                // by the specification, the semantics are undefined. 
+                // ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods/GET
+
+                // Warning should be raised if a GET request contains body/payload 
+                if request.body.next() != None {
+                    println!("warning: GET request contains body/payload");
+                }
+
                 // check if requsested resource exists
                 let filename = if request.url == "/" {
                     format!("{}/index.html", root_dir)
@@ -187,29 +228,104 @@ impl HttpResponse<'_> {
                 match fs::File::open(&filename) {
                     // if resource exists, return 200
                     Ok(_) => {
+                        let body = fs::read_to_string(&filename).unwrap();
+                        headers.insert("Content-Length".to_string(), body.chars().count().to_string());
                         return Some( Self {
                             status_code: 200,
                             status_text: "OK",
                             headers: headers,
-                            body: fs::read_to_string(&filename).unwrap(),
+                            body: body,
                         })
                     } 
                     // if resource dose not exist, return 404
                     _ => {
+                        let body = fs::read_to_string(format!("{}/error/404.html", root_dir)).unwrap();
+                        headers.insert("Content-Length".to_string(), body.chars().count().to_string());
                         return Some( Self {
                             status_code: 404,
                             status_text: "NOT FOUND",
                             headers: headers,
-                            body: fs::read_to_string(format!("{}/error/404.html", root_dir)).unwrap(),
+                            body: body,
                         })
                     }
                 }
             }
+
             HttpRequestMethod::POST => {
                 println!("POST is not supported for now");
                 return None
             }
-        }  
+
+            HttpRequestMethod::PUT => {
+                let raw_length = match request.headers.get("Content-length") {
+                    Some(i) => i,
+                    None => return None,
+                };
+                let length = match raw_length.parse::<usize>() {
+                    Ok(i) => i,
+                    Err(_) => return None,
+                };
+
+                // length check
+                if length >= BUFFER_SIZE {
+                    return Some(HttpResponse::error_507())
+                }
+                // get content from request
+                let mut content = String::new();
+                loop {
+                    if let Some(i) = request.body.next() {
+                        content = content + i.clone(); // FIXME
+                    } else {
+                        break;
+                    }
+                }
+                let filename = format!("{}/{}", root_dir, request.url);
+                match fs::File::open(&filename) {
+                    Ok(_) => {
+                        // if resource exists, try to update it
+                        match fs::write(&filename, content) {
+                            Ok(_) => {
+                                return Some( Self {
+                                    status_code: 200,
+                                    status_text: "OK",
+                                    headers: headers,
+                                    body: format!("Content-Location: {}", request.url).to_string(),
+                                })
+                            }
+                            _ => {
+                                return Some(HttpResponse::error_500())
+                            }
+                        }
+                    } 
+                    // if resource dose not exist, create it
+                    _ => {
+                        match fs::write(&filename, content) {
+                            Ok(_) => {
+                                return Some( Self {
+                                    status_code: 201,
+                                    status_text: "Created",
+                                    headers: headers,
+                                    body: format!("Content-Location: {}", request.url).to_string(),
+                                })
+                            }
+                            _ => {
+                                return Some(HttpResponse::error_500())
+                            }
+                        }
+                    }
+                }
+            }
+
+            HttpRequestMethod::HEAD => {
+                println!("HEAD is not supported for now");
+                return None
+            }
+
+            HttpRequestMethod::OPTIONS => {
+                println!("OPTIONS is not supported for now");
+                return None
+            }
+        }
     }
 
     /// Generate real HTTP response from HttpResponse 

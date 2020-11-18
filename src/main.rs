@@ -9,8 +9,8 @@
 ///     * 实现Parser [DONE]
 ///     * 实现RESP字符串生成 [DONE]
 /// * 完善方法
-///     * GET
-///     * PUT
+///     * GET [DONE]
+///     * PUT [DONE]
 ///     * POST
 ///     * HEAD
 ///     * OPTIONS
@@ -52,7 +52,6 @@
 /// HTTP Standard Reference
 /// ref: https://developer.mozilla.org/en-US/docs/Web/HTTP
 
-use std::fs;
 use std::io::prelude::*;
 use std::net::TcpListener;
 use std::net::TcpStream;
@@ -86,6 +85,8 @@ impl Default for Config {
         root_dir: "/mnt/c/Workpath/rhttp/page".into()
     } }
 }
+
+const BUFFER_SIZE: usize = 4096;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "RHTTP", about = "Rust HTTP Server for NW 2020.")]
@@ -134,7 +135,7 @@ fn main() {
 }
 
 fn handle_connection(mut stream: TcpStream, root_dir: &str) {
-    let mut buffer = [0; 1024]; //TODO: FIXME
+    let mut buffer = [0; BUFFER_SIZE];
     stream.read(&mut buffer).unwrap();
             
     // ref: https://stackoverflow.com/questions/60070627/does-stringfrom-utf8-lossy-allocate-memory
@@ -145,10 +146,10 @@ fn handle_connection(mut stream: TcpStream, root_dir: &str) {
     println!("Raw request:\n{}", String::from_utf8_lossy(&buffer[..]));
     let buf_str = &String::from_utf8_lossy(&buffer[..]);
 
-    let request = HttpRequest::from(buf_str as &str); // from_utf8_lossy returns a Cow<'a, str>, use as to make compiler happy
+    let mut request = HttpRequest::from(buf_str as &str); // from_utf8_lossy returns a Cow<'a, str>, use as to make compiler happy
     println!("{}", request);
 
-    match HttpResponse::new(&request, root_dir) {
+    match HttpResponse::new(&mut request, root_dir) {
         Some(response) => {
             println!("{}\n", response);
             stream.write(response.generate_string().as_bytes()).unwrap();
