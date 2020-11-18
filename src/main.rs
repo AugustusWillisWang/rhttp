@@ -2,21 +2,56 @@
 /// 
 /// Rust HTTP Server for NW 2020
 
-// TODO List
+/// TODO List
+/// * 完善HTTP Req框架
+///     * 添加Header处理
+/// * 实现HTTP Resp框架
+///     * 实现Parser
+///     * 实现返回函数
+///     * 根据status_id, 判断返回内容
+/// * 完善方法
+///     * GET
+///     * PUT
+///     * POST
+///     * HEAD
+///     * OPTIONS
+/// * 实现Test框架
+///     * 检查各种方法的实现
+///     * 检查多线程的实现
+///     * RUST使用TCP发送数据可参考: https://blog.csdn.net/lcloveyou/article/details/105755676
+/// * 详细实现POST方法中对Content-Type的支持: 支持使用POST传输文件: 
+///     * ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
+///     * multipart/form-data暂不准备实现
+///     * 文件传输测试
+/// * 分块传输支持
+///     * ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Transfer-Encoding
+///     * 分块传输解析
+///         * Transfer-Encoding: chunked
+///         * New API
+/// * Keep-alive
+/// * Pipelined
+/// * HTTPS
 
-// * HTTP Post/Get
-// * Upload
-// * Download
-// * HTTP分块传输
-// * 支持HTTP持久连接和管道
-// * Use lib to deal with HTTPS Request
-// * openssl or others?
+/// 要求列表
+/// * HTTP Get [DONE]
+/// * HTTP Post
+/// * Upload
+/// * Download
+/// * HTTP分块传输
+/// * 支持HTTP持久连接和管道 ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Connection_management_in_HTTP_1.x
+/// * Use lib to deal with HTTPS Request
+///     * openssl or others?
+/// * multithread [DONE]
 
-// RUST related opt
-//
-// * env_logger  ref: http://llever.com/CliInput-wg-zh/tutorial/output.zh.html
-// * structopt for CliInput parameter parsing
-// * confy for Serialize/Deserialize config
+/// RUST related opt
+///
+/// * env_logger for log in different level
+///     * ref: http://llever.com/CliInput-wg-zh/tutorial/output.zh.html
+/// * structopt for CliInput parameter parsing [DONE]
+/// * confy for Serialize/Deserialize config [DONE]
+
+/// HTTP Standard Reference
+/// ref: https://developer.mozilla.org/en-US/docs/Web/HTTP
 
 use std::fs;
 use std::io::prelude::*;
