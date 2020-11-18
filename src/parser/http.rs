@@ -1,5 +1,6 @@
 /// HTTP Request / Response Parser
 
+use std::fs;
 use std::fmt;
 use std::collections::BTreeMap;
 
@@ -36,7 +37,7 @@ impl fmt::Display for HttpRequest<'_> {
             // HttpRequestMethod::POST => "POST",
             _ => "ILLEGAL"
         };
-        write!(f, "HttpRequest:\nmethod {}\nurl {}\nversion {}\nheaders {:#?}\nbody {:#?}", req_type, self.url, self.version, self.headers, self.body)
+        write!(f, "HttpRequest:\nmethod {}\nurl {}\nversion {}\nheaders {:#?}", req_type, self.url, self.version, self.headers)
     }
 }
 
@@ -124,12 +125,12 @@ pub struct HttpResponse<'t> {
     pub status_code: u32,
     pub status_text: &'t str,
     pub headers: BTreeMap<String, &'t str>, // Other fields in head, if necessary
-    pub body: &'t str,
+    pub body: String,
 }
 
 impl fmt::Display for HttpResponse<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "HttpResponse:\nstatus_code {}\n status_text {}\nheaders {:#?}", self.status_code, self.status_text, self.headers)
+        write!(f, "HttpResponse:\nstatus_code {}\nstatus_text {}\nheaders {:#?}", self.status_code, self.status_text, self.headers)
     }
 }
 
@@ -140,45 +141,79 @@ impl HttpResponse<'_> {
             status_code: 404,
             status_text: "Undefined Interal Error",
             headers: BTreeMap::<String, &str>::new(),
-            body: "Undefined Interal Error Resp Body"
+            body: "Undefined Interal Error Resp Body".to_string(),
         }
     }
 
-    fn new(request: &HttpRequest) -> Self {
-        let status_code = 404;
-        let status_text = "Undefined Interal Error";
+    /// Generate HttpResponse from HttpRequest
+    /// 
+    /// Return Ok(HttpResponse) if a response is needed
+    /// Return None if no response is required
+    pub fn new(request: &HttpRequest, root_dir: &str) -> Option<Self> {
+        // let status_code =  404;
+        // let status_text = "Undefined Interal Error";
         let mut headers = BTreeMap::<String, &str>::new();
-        let body = "Undefined Interal Error Resp Body";
-
+        // let body = "Undefined Interal Error Resp Body";
+        
         // Response Headers
         headers.insert("Server".to_string(), "rhttp");
-
+        
         // Entity Headers
         // TODO: Content-Type
 
         // General Headers
         // TODO: Connection
         // TODO: Keep-Alive
-
-        // HttpRequest match ...
         
-        // Generate body and body related headers
         // body_type match ... {...}
         // TODO: Content-Type
         // TODO: Content-Length
         // TODO: Transfer-Encoding
         // Ignored: Multiple-resource bodies
-        
-        Self {
-            status_code: status_code,
-            status_text: status_text,
-            headers: headers,
-            body: body
-        }
+
+        // HttpRequest match
+        match request.method {
+            HttpRequestMethod::ILLEGAL => {
+                println!("Ignored illegal request");
+                return None
+            }
+            HttpRequestMethod::GET => {
+                // check if requsested resource exists
+                let filename = if request.url == "/" {
+                    format!("{}/index.html", root_dir)
+                } else {
+                    format!("{}/{}", root_dir, request.url)
+                };
+                match fs::File::open(&filename) {
+                    // if resource exists, return 200
+                    Ok(_) => {
+                        return Some( Self {
+                            status_code: 200,
+                            status_text: "OK",
+                            headers: headers,
+                            body: fs::read_to_string(&filename).unwrap(),
+                        })
+                    } 
+                    // if resource dose not exist, return 404
+                    _ => {
+                        return Some( Self {
+                            status_code: 404,
+                            status_text: "NOT FOUND",
+                            headers: headers,
+                            body: fs::read_to_string(format!("{}/error/404.html", root_dir)).unwrap(),
+                        })
+                    }
+                }
+            }
+            HttpRequestMethod::POST => {
+                println!("POST is not supported for now");
+                return None
+            }
+        }  
     }
 
     /// Generate real HTTP response from HttpResponse 
-    fn to_string(&self) -> String {
+    pub fn generate_string(&self) -> String {
         let status_line = format!("HTTP/1.1 {} {}\n", self.status_code, self.status_text);
         let mut headers_str = String::new();
         // TODO: use vec, and use vec.resource(1024) to pre allocate space
@@ -188,8 +223,7 @@ impl HttpResponse<'_> {
             headers_str = headers_str + &format!("{}: {}\n", k, v).to_string(); // FIXME: perf loss
         }
         headers_str.push('\n'); // add a space line
-        let body = self.body;
         // read file if necessary
-        String::from(format!("{}{}{}", status_line, headers_str, body))
+        String::from(format!("{}{}{}", status_line, headers_str, self.body))
     }
 }

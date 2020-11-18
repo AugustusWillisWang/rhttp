@@ -5,10 +5,9 @@
 /// TODO List
 /// * 完善HTTP Req框架 [DONE]
 ///     * 添加Header处理 [DONE]
-/// * 实现HTTP Resp框架
-///     * 实现Parser
-///     * 实现返回函数
-///     * 根据status_id, 判断返回内容
+/// * 实现HTTP Resp框架 [DONE]
+///     * 实现Parser [DONE]
+///     * 实现RESP字符串生成 [DONE]
 /// * 完善方法
 ///     * GET
 ///     * PUT
@@ -135,7 +134,7 @@ fn main() {
 }
 
 fn handle_connection(mut stream: TcpStream, root_dir: &str) {
-    let mut buffer = [0; 1024];
+    let mut buffer = [0; 1024]; //TODO: FIXME
     stream.read(&mut buffer).unwrap();
             
     // ref: https://stackoverflow.com/questions/60070627/does-stringfrom-utf8-lossy-allocate-memory
@@ -145,40 +144,16 @@ fn handle_connection(mut stream: TcpStream, root_dir: &str) {
     // > This return type allows us to handle both cases.
     println!("Raw request:\n{}", String::from_utf8_lossy(&buffer[..]));
     let buf_str = &String::from_utf8_lossy(&buffer[..]);
-    // let request = parse_http_head(buf_str).unwrap();
+
     let request = HttpRequest::from(buf_str as &str); // from_utf8_lossy returns a Cow<'a, str>, use as to make compiler happy
-    println!("Parsed request: {}", request);
-    
-    let page_dir = root_dir;
-    
-    let (status_line, filename) = match request.method {
-        HttpRequestMethod::ILLEGAL => {
-            println!("Ignored illegal request");
-            return;
+    println!("{}", request);
+
+    match HttpResponse::new(&request, root_dir) {
+        Some(response) => {
+            println!("{}\n", response);
+            stream.write(response.generate_string().as_bytes()).unwrap();
+            stream.flush().unwrap();
         }
-        HttpRequestMethod::GET => {
-            // check if requsested resource exists
-            if request.url == "/" {
-                ("HTTP/1.1 200 OK\r\n\r\n", format!("{}/index.html", page_dir))
-            } else {
-                let full_filename = format!("{}{}", page_dir, request.url);
-                match fs::File::open(&full_filename) {
-                    Ok(_) => ("HTTP/1.1 200 OK\r\n\r\n", full_filename), // if resource exists, return it to CliInputent
-                    _ => ("HTTP/1.1 404 NOT FOUND\r\n\r\n", format!("{}/error/404.html", page_dir)), // otherwise, 404
-                }
-            }
-        }
-        HttpRequestMethod::POST => {
-            println!("POST is not supported for now");
-            return;
-        }
-    };
-    
-    println!("Return file {}\n", filename);
-    
-    let contents = fs::read_to_string(filename).unwrap();
-    let response = format!("{}{}", status_line, contents);
-    
-    stream.write(response.as_bytes()).unwrap();
-    stream.flush().unwrap();
+        _ => return
+    } 
 }
