@@ -12,7 +12,7 @@
 ///     * GET [DONE]
 ///     * PUT [DONE]
 ///     * POST
-///     * HEAD
+///     * HEAD [DONE]
 ///     * OPTIONS
 /// * 实现Test框架
 ///     * 检查各种方法的实现
