@@ -147,15 +147,32 @@ impl fmt::Display for HttpResponse<'_> {
 
 impl HttpResponse<'_> {
 
-    // fn error_404() -> Self {
-    //     // for testing only, should not reach here
-    //     Self {
-    //         status_code: 404,
-    //         status_text: "Not Found",
-    //         headers: BTreeMap::<String, &str>::new(),
-    //         body: "404 Not Found".to_string(),
-    //     }
-    // }
+    fn error_400() -> Self {
+        Self {
+            status_code: 400,
+            status_text: "Bad Request",
+            headers: BTreeMap::<String, String>::new(),
+            body: "".to_string(),
+        }
+    }
+
+    fn error_404() -> Self {
+        Self {
+            status_code: 404,
+            status_text: "Not Found",
+            headers: BTreeMap::<String, String>::new(),
+            body: "404 Not Found".to_string(),
+        }
+    }
+
+    fn error_405() -> Self {
+        Self {
+            status_code: 405,
+            status_text: "Method Not Allowed",
+            headers: BTreeMap::<String, String>::new(),
+            body: "".to_string(),
+        }
+    }
 
     fn error_500() -> Self {
         Self {
@@ -252,8 +269,141 @@ impl HttpResponse<'_> {
             }
 
             HttpRequestMethod::POST => {
-                println!("POST is not supported for now");
-                return None
+                let raw_length = match request.headers.get("Content-length") {
+                    Some(i) => i,
+                    None => return None,
+                };
+                let length = match raw_length.parse::<usize>() {
+                    Ok(i) => i,
+                    Err(_) => return None,
+                };
+
+                // length check
+                if length >= BUFFER_SIZE {
+                    return Some(HttpResponse::error_507())
+                }
+                
+                let content_type = match request.headers.get("Content-Type") {
+                    Some(i) => i,
+                    _ => return Some(HttpResponse::error_400())
+                };
+                let filename = format!("{}/{}", root_dir, request.url);
+                match content_type {
+                    &"application/x-www-form-urlencoded" => {
+                        let mut content = BTreeMap::<String, &str>::new();
+                        loop {
+                            if let Some(line) = request.body.next() {
+                                let kv_pair = line.split("&");
+                                for i in kv_pair {
+                                    let mut j = i.split("=");
+                                    if let Some(k) = j.next() {
+                                        if let Some(v) = j.next() {
+                                            content.insert(k.to_string(), v);
+                                        }
+                                    }
+                                }
+                            } else {
+                                break;
+                            }
+                        }
+
+                        // TODO: you can add extra data process here 
+                        println!("received kvpairs from POST: {:#?}", content);
+                        
+                        return Some( Self {
+                            status_code: 200,
+                            status_text: "OK",
+                            headers: headers,
+                            body: "".to_string(),
+                        })
+                    },
+                    &"text/plain" => {
+                        // transfer data to server
+                        // get content from request
+                        let mut content = String::new();
+                        loop {
+                            if let Some(i) = request.body.next() {
+                                content = content + i.clone(); // FIXME
+                            } else {
+                                break;
+                            }
+                        }
+                        match fs::File::open(&filename) {
+                            Ok(_) => {
+                                // if resource exists, try to update it
+                                match fs::write(&filename, content) {
+                                    Ok(_) => {
+                                        return Some( Self {
+                                            status_code: 200,
+                                            status_text: "OK",
+                                            headers: headers,
+                                            body: format!("Content-Location: {}", request.url).to_string(),
+                                        })
+                                    }
+                                    _ => {
+                                        return Some(HttpResponse::error_500())
+                                    }
+                                }
+                            } 
+                            // if resource dose not exist, create it
+                            _ => {
+                                match fs::write(&filename, content) {
+                                    Ok(_) => {
+                                        return Some( Self {
+                                            status_code: 201,
+                                            status_text: "Created",
+                                            headers: headers,
+                                            body: format!("Content-Location: {}", request.url).to_string(),
+                                        })
+                                    }
+                                    _ => {
+                                        return Some(HttpResponse::error_500())
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    x => {
+                        if !x.starts_with("multipart/form-data") {
+                            return Some(HttpResponse::error_405())
+                        } else {
+                            // get boundry
+                            let mut value_splited = x.split("boundry=");
+                            let boundry = match value_splited.next() {
+                                Some(_) => {
+                                    match value_splited.next() {
+                                        Some(i) => i,
+                                        _ => return Some(HttpResponse::error_400()) 
+                                    }
+                                },
+                                _ => return Some(HttpResponse::error_400())
+                            };
+                            let mut content = Vec::<String>::new();
+                            let mut new_part = String::new();
+                            while let Some(line) = request.body.next() {
+                                if line.starts_with(&format!("--{}--", boundry)) {
+                                    break
+                                }
+                                if line.starts_with(&format!("--{}", boundry)) && new_part.chars().count() > 0 {
+                                    content.push(new_part.clone()); // content get old new_part 
+                                    new_part = String::new();
+                                } else {
+                                    new_part = new_part + line;
+                                }
+                            }
+                            
+                            // TODO: you can add extra data process here 
+                            println!("received multipart from POST: {:#?}", content);
+                            
+                            return Some( Self {
+                                status_code: 200,
+                                status_text: "OK",
+                                headers: headers,
+                                body: "".to_string(),
+                            })
+                        }
+                    }
+                }
             }
 
             HttpRequestMethod::PUT => {

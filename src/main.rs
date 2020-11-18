@@ -11,16 +11,16 @@
 /// * 完善方法
 ///     * GET [DONE]
 ///     * PUT [DONE]
-///     * POST
+///     * POST [DONE]
 ///     * HEAD [DONE]
 ///     * OPTIONS [DONE]
 /// * 实现Test框架
 ///     * 检查各种方法的实现
 ///     * 检查多线程的实现
 ///     * RUST使用TCP发送数据可参考: https://blog.csdn.net/lcloveyou/article/details/105755676
-/// * 详细实现POST方法中对Content-Type的支持: 支持使用POST传输文件: 
+/// * 详细实现POST方法中对Content-Type的支持: 支持使用POST传输文件: [DONE] 
 ///     * ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
-///     * multipart/form-data暂不准备实现
+///     * multipart/form-data暂不准备实现 [DONE]
 ///     * 文件传输测试
 /// * 分块传输支持
 ///     * ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Transfer-Encoding
