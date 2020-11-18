@@ -92,29 +92,41 @@ const BUFFER_SIZE: usize = 4096;
 #[structopt(name = "RHTTP", about = "Rust HTTP Server for NW 2020.")]
 struct CliInput {
     // pattern: String,
-    /// verbosity level
+    /// Update config without running the real server
+    #[structopt(long = "update-config", parse(from_occurrences), default_value = "0")]
+    update_config: u32,
+    /// Verbosity level
     #[structopt(short = "v", parse(from_occurrences), default_value = "0")]
     verbose: u32,
     /// Set port
-    #[structopt(short = "p", default_value = "0")]
+    #[structopt(short = "p", long = "port", default_value = "0")]
     port: u32,
     /// Set number of threads
-    #[structopt(short = "j", default_value = "0")]
+    #[structopt(short = "j", long = "thread", default_value = "0")]
     thread_number: usize,
-    #[structopt(name = "FILE", parse(from_os_str), default_value = "")]
-    config_file: Vec<std::path::PathBuf>,
+    /// Set server root dir
+    #[structopt(short = "r", long = "root-dir", name = "server_root_dir", default_value = "")]
+    root_dir: String,
 }
 
 fn main() {
     let args = CliInput::from_args();
     println!("RHTTP server started.");
     println!("{:#?}", args);
-    let mut cfg: Config = confy::load("config").unwrap();
+    let mut cfg: Config = confy::load("rhttp_config").unwrap();
     if args.port != 0 {
         cfg.port = args.port;
     }
     if args.thread_number != 0 {
         cfg.thread_number = args.thread_number;
+    }
+    if args.root_dir != "" {
+        cfg.root_dir = args.root_dir.clone();
+    }
+    if args.update_config != 0 {
+        println!("New config updated:\n{:#?}", cfg);
+        confy::store("rhttp_config", cfg).unwrap();
+        return
     }
     println!("{:#?}", cfg);
     let listener = TcpListener::bind(format!("127.0.0.1:{}", cfg.port)).unwrap();
