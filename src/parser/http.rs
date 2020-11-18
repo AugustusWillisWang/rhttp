@@ -114,4 +114,82 @@ impl HttpRequest<'_> {
 
 // Parse HTTP Response
 
-// TODO
+/// HTTP response waiting for sending
+#[derive(Debug)]
+pub struct HttpResponse<'t> {
+    // ref: https://github.com/lennart-bot/lhi/blob/master/src/server/request.rs
+    // It provides the idea to use reference & BTreeMap to track http head entries
+    
+    // ref: https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Messages
+    pub status_code: u32,
+    pub status_text: &'t str,
+    pub headers: BTreeMap<String, &'t str>, // Other fields in head, if necessary
+    pub body: &'t str,
+}
+
+impl fmt::Display for HttpResponse<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "HttpResponse:\nstatus_code {}\n status_text {}\nheaders {:#?}", self.status_code, self.status_text, self.headers)
+    }
+}
+
+impl HttpResponse<'_> {
+    fn new_404() -> Self {
+        // for testing only, should not reach here
+        Self {
+            status_code: 404,
+            status_text: "Undefined Interal Error",
+            headers: BTreeMap::<String, &str>::new(),
+            body: "Undefined Interal Error Resp Body"
+        }
+    }
+
+    fn new(request: &HttpRequest) -> Self {
+        let status_code = 404;
+        let status_text = "Undefined Interal Error";
+        let mut headers = BTreeMap::<String, &str>::new();
+        let body = "Undefined Interal Error Resp Body";
+
+        // Response Headers
+        headers.insert("Server".to_string(), "rhttp");
+
+        // Entity Headers
+        // TODO: Content-Type
+
+        // General Headers
+        // TODO: Connection
+        // TODO: Keep-Alive
+
+        // HttpRequest match ...
+        
+        // Generate body and body related headers
+        // body_type match ... {...}
+        // TODO: Content-Type
+        // TODO: Content-Length
+        // TODO: Transfer-Encoding
+        // Ignored: Multiple-resource bodies
+        
+        Self {
+            status_code: status_code,
+            status_text: status_text,
+            headers: headers,
+            body: body
+        }
+    }
+
+    /// Generate real HTTP response from HttpResponse 
+    fn to_string(&self) -> String {
+        let status_line = format!("HTTP/1.1 {} {}\n", self.status_code, self.status_text);
+        let mut headers_str = String::new();
+        // TODO: use vec, and use vec.resource(1024) to pre allocate space
+        // body.size may help 
+        // headers_str.resource(1024);
+        for (k, v) in &self.headers {
+            headers_str = headers_str + &format!("{}: {}\n", k, v).to_string(); // FIXME: perf loss
+        }
+        headers_str.push('\n'); // add a space line
+        let body = self.body;
+        // read file if necessary
+        String::from(format!("{}{}{}", status_line, headers_str, body))
+    }
+}
