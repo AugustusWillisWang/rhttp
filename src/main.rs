@@ -13,7 +13,7 @@
 ///     * PUT [DONE]
 ///     * POST
 ///     * HEAD [DONE]
-///     * OPTIONS
+///     * OPTIONS [DONE]
 /// * 实现Test框架
 ///     * 检查各种方法的实现
 ///     * 检查多线程的实现
