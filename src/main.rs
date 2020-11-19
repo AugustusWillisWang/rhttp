@@ -1,35 +1,35 @@
-/// RHTTP
-/// 
-/// Rust HTTP Server for NW 2020
-
-/// TODO List
-/// * 完善HTTP Req框架 [DONE]
-///     * 添加Header处理 [DONE]
-/// * 实现HTTP Resp框架 [DONE]
-///     * 实现Parser [DONE]
-///     * 实现RESP字符串生成 [DONE]
-/// * 完善方法
-///     * GET [DONE]
-///     * PUT [DONE]
-///     * POST [DONE]
-///     * HEAD [DONE]
-///     * OPTIONS [DONE]
-/// * 实现Test框架
-///     * 检查各种方法的实现
-///     * 检查多线程的实现
-///     * RUST使用TCP发送数据可参考: https://blog.csdn.net/lcloveyou/article/details/105755676
-/// * 详细实现POST方法中对Content-Type的支持: 支持使用POST传输文件: [DONE] 
-///     * ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
-///     * multipart/form-data暂不准备实现 [DONE]
-///     * 文件传输测试
-/// * 分块传输支持
-///     * ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Transfer-Encoding
-///     * 分块传输解析
-///         * Transfer-Encoding: chunked
-///         * New API
-/// * Keep-alive
-/// * Pipelined
-/// * HTTPS
+//! RHTTP
+//! 
+//! Rust HTTP Server for NW 2020
+//! 
+//! TODO List
+//! * 完善HTTP Req框架 [DONE]
+//!     * 添加Header处理 [DONE]
+//! * 实现HTTP Resp框架 [DONE]
+//!     * 实现Parser [DONE]
+//!     * 实现RESP字符串生成 [DONE]
+//! * 完善方法
+//!     * GET [DONE]
+//!     * PUT [DONE]
+//!     * POST [DONE]
+//!     * HEAD [DONE]
+//!     * OPTIONS [DONE]
+//! * 实现Test框架
+//!     * 检查各种方法的实现
+//!     * 检查多线程的实现
+//!     * RUST使用TCP发送数据可参考: https://blog.csdn.net/lcloveyou/article/details/105755676
+//! * 详细实现POST方法中对Content-Type的支持: 支持使用POST传输文件: [DONE] 
+//!     * ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
+//!     * multipart/form-data暂不准备实现 [DONE]
+//!     * 文件传输测试
+//! * 分块传输支持
+//!     * ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Transfer-Encoding
+//!     * 分块传输解析
+//!         * Transfer-Encoding: chunked
+//!         * New API
+//! * Keep-alive
+//! * Pipelined
+//! * HTTPS
 
 /// 要求列表
 /// * HTTP Get [DONE]
@@ -48,6 +48,8 @@
 ///     * ref: http://llever.com/CliInput-wg-zh/tutorial/output.zh.html
 /// * structopt for CliInput parameter parsing [DONE]
 /// * confy for Serialize/Deserialize config [DONE]
+/// * refactor: let reader = BufReader::new(&stream);
+/// * refactor: let mut writer = BufWriter::new(&stream);
 
 /// HTTP Standard Reference
 /// ref: https://developer.mozilla.org/en-US/docs/Web/HTTP
@@ -161,12 +163,33 @@ fn handle_connection(mut stream: TcpStream, root_dir: &str) {
     let mut request = HttpRequest::from(buf_str as &str); // from_utf8_lossy returns a Cow<'a, str>, use as to make compiler happy
     println!("{}", request);
 
+    // if keep-alive is not assigned, mark Connection as close
+    let mut keep_alive = true; // keep_alive is opened by default
+    if let Some(connection) = request.headers.get("Connection") {
+        if connection.trim() != "keep-alive" {
+            keep_alive = false; // invalid header, close it
+        }
+    } else {
+        keep_alive = false;
+    }
+    
     match HttpResponse::new(&mut request, root_dir) {
         Some(response) => {
+            // if headers.Connection not assigned, assign it automaticly
+            if let Some(resp_keep_alive) = request.headers.get("Connection") {
+                keep_alive = resp_keep_alive.trim() == "keep-alive";
+            } else {
+                let connection_value = if keep_alive { "keep_alive" } else { "close" };
+                request.headers.insert("Connection".to_string(), connection_value);
+            }
             println!("{}\n", response);
             stream.write(response.generate_string().as_bytes()).unwrap();
             stream.flush().unwrap();
         }
-        _ => return
+        _ => return // TCP will also be closed
     } 
+
+    // if !keep_alive {
+    //     StopTCP;
+    // }
 }
