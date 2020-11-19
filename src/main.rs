@@ -78,13 +78,15 @@ struct Config {
     port: u32,
     thread_number: usize,
     root_dir: String,
+    timeout: i32,
 }
 
 impl Default for Config {
     fn default() -> Self { Self {
         port: 7878,
         thread_number: 4,
-        root_dir: "/mnt/c/Workpath/rhttp/page".into()
+        root_dir: "/mnt/c/Workpath/rhttp/page".into(),
+        timeout: 8,
     } }
 }
 
@@ -97,6 +99,9 @@ struct CliInput {
     /// Update config without running the real server
     #[structopt(long = "update-config", parse(from_occurrences), default_value = "0")]
     update_config: u32,
+    /// Use config
+    #[structopt(long = "load-config", parse(from_occurrences), default_value = "0")]
+    load_config: u32,
     /// Verbosity level
     #[structopt(short = "v", parse(from_occurrences), default_value = "0")]
     verbose: u32,
@@ -106,21 +111,32 @@ struct CliInput {
     /// Set number of threads
     #[structopt(short = "j", long = "thread", default_value = "0")]
     thread_number: usize,
+    /// Set timeout limit
+    #[structopt(short = "t", long = "timeout", default_value = "-1")]
+    timeout: i32,
     /// Set server root dir
     #[structopt(short = "r", long = "root-dir", name = "server_root_dir", default_value = "")]
     root_dir: String,
 }
 
 fn main() {
+    // setup config
     let args = CliInput::from_args();
     println!("RHTTP server started.");
     println!("{:#?}", args);
-    let mut cfg: Config = confy::load("rhttp_config").unwrap();
+    let mut cfg: Config = if args.load_config != 0 {
+        confy::load("rhttp_config").unwrap()
+    } else {
+        Config::default()
+    };
     if args.port != 0 {
         cfg.port = args.port;
     }
     if args.thread_number != 0 {
         cfg.thread_number = args.thread_number;
+    }
+    if args.timeout != -1 {
+        cfg.timeout = args.timeout;
     }
     if args.root_dir != "" {
         cfg.root_dir = args.root_dir.clone();
@@ -131,15 +147,19 @@ fn main() {
         return
     }
     println!("{:#?}", cfg);
+
+    // prepare TCP port and thread pool
     let listener = TcpListener::bind(format!("127.0.0.1:{}", cfg.port)).unwrap();
     let pool = ThreadPool::new(cfg.thread_number);
 
+    // when new TCP request incomes, handle_connection
     loop {
         for stream in listener.incoming().take(2) {
             let stream = stream.unwrap();
             let root_dir = cfg.root_dir.clone();
+            let timeout = cfg.timeout as u32;
             pool.execute(move || {
-                handle_connection(stream, &root_dir);
+                handle_connection(stream, &root_dir, timeout);
             });
         }
     }
@@ -148,48 +168,62 @@ fn main() {
     // println!("Shutting down.");
 }
 
-fn handle_connection(mut stream: TcpStream, root_dir: &str) {
-    let mut buffer = [0; BUFFER_SIZE];
-    stream.read(&mut buffer).unwrap();
-            
-    // ref: https://stackoverflow.com/questions/60070627/does-stringfrom-utf8-lossy-allocate-memory
-    // > If our byte slice is invalid UTF-8, then we need to insert the replacement characters, 
-    // > which will change the size of the string, and hence, require a String. 
-    // > But if it's already valid UTF-8, we don't need a new allocation. 
-    // > This return type allows us to handle both cases.
-    println!("Raw request:\n{}", String::from_utf8_lossy(&buffer[..]));
-    let buf_str = &String::from_utf8_lossy(&buffer[..]);
-
-    let mut request = HttpRequest::from(buf_str as &str); // from_utf8_lossy returns a Cow<'a, str>, use as to make compiler happy
-    println!("{}", request);
-
-    // if keep-alive is not assigned, mark Connection as close
-    let mut keep_alive = true; // keep_alive is opened by default
-    if let Some(connection) = request.headers.get("Connection") {
-        if connection.trim() != "keep-alive" {
-            keep_alive = false; // invalid header, close it
+fn handle_connection(mut stream: TcpStream, root_dir: &str, timeout: u32) {
+    loop{
+        let mut buffer = [0; BUFFER_SIZE];
+        match stream.read(&mut buffer) {
+            Err(_) => { 
+                // TCP timeout, close TCP link
+                println!("keep-alive timeout, close TCP link.");
+                return 
+            } 
+            _ => {}
         }
-    } else {
-        keep_alive = false;
-    }
-    
-    match HttpResponse::new(&mut request, root_dir) {
-        Some(response) => {
-            // if headers.Connection not assigned, assign it automaticly
-            if let Some(resp_keep_alive) = request.headers.get("Connection") {
-                keep_alive = resp_keep_alive.trim() == "keep-alive";
-            } else {
-                let connection_value = if keep_alive { "keep_alive" } else { "close" };
-                request.headers.insert("Connection".to_string(), connection_value);
+        
+        // ref: https://stackoverflow.com/questions/60070627/does-stringfrom-utf8-lossy-allocate-memory
+        // > If our byte slice is invalid UTF-8, then we need to insert the replacement characters, 
+        // > which will change the size of the string, and hence, require a String. 
+        // > But if it's already valid UTF-8, we don't need a new allocation. 
+        // > This return type allows us to handle both cases.
+        println!("Raw request:\n{}", String::from_utf8_lossy(&buffer[..]));
+        let buf_str = &String::from_utf8_lossy(&buffer[..]);
+        
+        // parse http request
+        let mut request = HttpRequest::from(buf_str as &str); // from_utf8_lossy returns a Cow<'a, str>, use as to make compiler happy
+        println!("{}", request);
+        
+        // if keep-alive is not assigned, mark Connection as close
+        let mut keep_alive = true; // keep_alive is opened by default
+        if let Some(connection) = request.headers.get("Connection") {
+            if connection.to_lowercase() != "keep-alive" {
+                keep_alive = false; // invalid header, close it
             }
-            println!("{}\n", response);
-            stream.write(response.generate_string().as_bytes()).unwrap();
-            stream.flush().unwrap();
+        } else {
+            keep_alive = false;
         }
-        _ => return // TCP will also be closed
-    } 
-
-    // if !keep_alive {
-    //     StopTCP;
-    // }
+        
+        // generate http response according to require type
+        match HttpResponse::new(&mut request, root_dir) {
+            Some(mut response) => {
+                // if headers.Connection not assigned, assign it automaticly
+                if let Some(resp_keep_alive) = response.headers.get("Connection") {
+                    keep_alive = resp_keep_alive.to_lowercase() == "keep-alive";
+                } else {
+                    let connection_value = if keep_alive { "keep_alive" } else { "close" };
+                    response.headers.insert("Connection".to_string(), connection_value.to_string());
+                    println!("keep_alive: {}", keep_alive);
+                }
+                println!("{}\n", response);
+                stream.write(response.generate_string().as_bytes()).unwrap();
+                stream.flush().unwrap();
+                if !keep_alive {
+                    return;
+                } else {
+                    stream.set_read_timeout(Some(std::time::Duration::new(0, timeout))).unwrap();
+                }
+            }
+            _ => return // TCP will also be closed
+        } 
+    }
 }
+    
