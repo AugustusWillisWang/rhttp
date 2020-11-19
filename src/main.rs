@@ -57,7 +57,7 @@
 use std::io::prelude::*;
 use std::net::TcpListener;
 use std::net::TcpStream;
-// use std::thread;
+use std::thread;
 // use std::time::Duration;
 
 mod tpool;
@@ -66,7 +66,9 @@ use tpool::*;
 mod parser; // parser for http head
 use parser::http::*; // import http head data structure
 
-// use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
+use openssl::ssl::{SslMethod, SslAcceptor, SslStream, SslFiletype};
+use std::sync::Arc;
+
 use structopt::StructOpt;
 extern crate confy;
 #[macro_use]
@@ -131,16 +133,30 @@ fn main() {
         return
     }
     println!("{:#?}", cfg);
+
+    // certificate loading
+    let mut acceptor = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
+    acceptor.set_private_key_file("/home/lfz/Pictures/rhttp/page/test2020.com_key.key", SslFiletype::PEM).unwrap();
+    acceptor.set_certificate_chain_file("/home/lfz/Pictures/rhttp/page/test2020.com_chain.crt").unwrap();
+    acceptor.check_private_key().unwrap();
+    let acceptor = Arc::new(acceptor.build());
+
     let listener = TcpListener::bind(format!("127.0.0.1:{}", cfg.port)).unwrap();
     let pool = ThreadPool::new(cfg.thread_number);
 
     loop {
         for stream in listener.incoming().take(2) {
-            let stream = stream.unwrap();
-            let root_dir = cfg.root_dir.clone();
-            pool.execute(move || {
-                handle_connection(stream, &root_dir);
-            });
+            match stream {
+                Ok(stream) => {
+                    let acceptor = acceptor.clone();
+                    let stream = acceptor.accept(stream).unwrap();
+                    let root_dir = cfg.root_dir.clone();
+                    pool.execute(move || {
+                        handle_connection(stream, &root_dir);
+                    });
+                }
+                Err(e) => { /* connection failed */ }
+            }
         }
     }
     
