@@ -27,7 +27,7 @@
 //!     * 分块传输解析
 //!         * Transfer-Encoding: chunked
 //!         * New API
-//! * Keep-alive
+//! * Keep-alive [DONE]
 //! * Pipelined
 //! * HTTPS
 
@@ -194,7 +194,7 @@ fn handle_connection(mut stream: TcpStream, root_dir: &str, timeout: u64) {
         
         // parse http request
         let mut request = HttpRequest::from(buf_str as &str); // from_utf8_lossy returns a Cow<'a, str>, use as to make compiler happy
-        println!("{}", request);
+        // println!("{}", request);
         
         // if keep-alive is not assigned, mark Connection as close
         let mut keep_alive = true; // keep_alive is opened by default
@@ -209,6 +209,8 @@ fn handle_connection(mut stream: TcpStream, root_dir: &str, timeout: u64) {
         // generate http response according to require type
         match HttpResponse::new(&mut request, root_dir) {
             Some(mut response) => {
+                // setup Keep-Alive: timeout
+                response.headers.insert("Keep-Alive".to_string(), format!("timeout={}", timeout));
                 // if headers.Connection not assigned, assign it automaticly
                 if let Some(resp_keep_alive) = response.headers.get("Connection") {
                     keep_alive = resp_keep_alive.to_lowercase() == "keep-alive";
@@ -220,6 +222,7 @@ fn handle_connection(mut stream: TcpStream, root_dir: &str, timeout: u64) {
                 println!("{}\n", response);
                 stream.write(response.generate_string().as_bytes()).unwrap();
                 stream.flush().unwrap();
+                println!("response send at {}.", std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH).unwrap().as_secs());
                 if !keep_alive {
                     return;
                 } else {
