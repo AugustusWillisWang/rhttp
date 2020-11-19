@@ -1,11 +1,10 @@
 use std::fs;
-use std::fmt;
 use std::collections::BTreeMap;
 
 use super::super::BUFFER_SIZE;
 use super::super::*;
 
-pub fn generate_post_response<'t>(request: &mut HttpRequest, mut headers: BTreeMap::<String, String>, root_dir: &str) -> Option<HttpResponse<'t>> {
+pub fn generate_post_response<'t>(request: &mut HttpRequest, headers: BTreeMap::<String, String>, root_dir: &str) -> Option<HttpResponse<'t>> {
     let raw_length = match request.headers.get("Content-length") {
         Some(i) => i,
         None => return None,

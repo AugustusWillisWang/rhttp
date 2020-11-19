@@ -1,6 +1,5 @@
 /// HTTP Request / Response Parser
 
-use std::fs;
 use std::fmt;
 use std::collections::BTreeMap;
 
@@ -161,7 +160,7 @@ impl HttpResponse<'_> {
         }
     }
 
-    pub fn error_404() -> Self {
+    pub fn _error_404() -> Self {
         Self {
             status_code: 404,
             status_text: "Not Found",

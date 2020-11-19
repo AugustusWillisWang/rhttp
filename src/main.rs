@@ -64,7 +64,7 @@ use tpool::*;
 mod parser; // parser for http head
 use parser::http::*; // import http head data structure
 
-use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
+// use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use structopt::StructOpt;
 extern crate confy;
 #[macro_use]
