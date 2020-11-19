@@ -75,10 +75,14 @@ extern crate serde;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Config {
+    /// port binging
     port: u32,
+    /// max number of threads created in the thread pool
     thread_number: usize,
-    root_dir: String,
-    timeout: i32,
+    /// file root dir
+    root_dir: String, 
+    /// timeout unit: secs
+    timeout: i64, 
 }
 
 impl Default for Config {
@@ -86,7 +90,7 @@ impl Default for Config {
         port: 7878,
         thread_number: 4,
         root_dir: "/mnt/c/Workpath/rhttp/page".into(),
-        timeout: 8,
+        timeout: 4,
     } }
 }
 
@@ -113,7 +117,7 @@ struct CliInput {
     thread_number: usize,
     /// Set timeout limit
     #[structopt(short = "t", long = "timeout", default_value = "-1")]
-    timeout: i32,
+    timeout: i64,
     /// Set server root dir
     #[structopt(short = "r", long = "root-dir", name = "server_root_dir", default_value = "")]
     root_dir: String,
@@ -157,7 +161,7 @@ fn main() {
         for stream in listener.incoming().take(2) {
             let stream = stream.unwrap();
             let root_dir = cfg.root_dir.clone();
-            let timeout = cfg.timeout as u32;
+            let timeout = cfg.timeout as u64;
             pool.execute(move || {
                 handle_connection(stream, &root_dir, timeout);
             });
@@ -168,7 +172,7 @@ fn main() {
     // println!("Shutting down.");
 }
 
-fn handle_connection(mut stream: TcpStream, root_dir: &str, timeout: u32) {
+fn handle_connection(mut stream: TcpStream, root_dir: &str, timeout: u64) {
     loop{
         let mut buffer = [0; BUFFER_SIZE];
         match stream.read(&mut buffer) {
@@ -219,7 +223,7 @@ fn handle_connection(mut stream: TcpStream, root_dir: &str, timeout: u32) {
                 if !keep_alive {
                     return;
                 } else {
-                    stream.set_read_timeout(Some(std::time::Duration::new(0, timeout))).unwrap();
+                    stream.set_read_timeout(Some(std::time::Duration::new(timeout, 0))).unwrap();
                 }
             }
             _ => return // TCP will also be closed
