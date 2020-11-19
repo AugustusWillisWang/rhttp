@@ -57,7 +57,7 @@
 use std::io::prelude::*;
 use std::net::TcpListener;
 use std::net::TcpStream;
-use std::thread;
+// use std::thread;
 // use std::time::Duration;
 
 mod tpool;
@@ -155,7 +155,7 @@ fn main() {
                         handle_connection(stream, &root_dir);
                     });
                 }
-                Err(e) => { /* connection failed */ }
+                Err(_e) => { /* connection failed */ }
             }
         }
     }
@@ -164,7 +164,7 @@ fn main() {
     // println!("Shutting down.");
 }
 
-fn handle_connection(mut stream: TcpStream, root_dir: &str) {
+fn handle_connection(mut stream: SslStream<TcpStream>, root_dir: &str) {
     let mut buffer = [0; BUFFER_SIZE];
     stream.read(&mut buffer).unwrap();
             
