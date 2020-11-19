@@ -53,6 +53,7 @@
 
 /// HTTP Standard Reference
 /// ref: https://developer.mozilla.org/en-US/docs/Web/HTTP
+/// ref: https://tools.ietf.org/html/rfc7230
 
 use std::io::prelude::*;
 use std::net::TcpListener;

@@ -259,7 +259,7 @@ impl HttpResponse<'_> {
         // body.size may help 
         // headers_str.resource(1024);
         for (k, v) in &self.headers {
-            headers_str = headers_str + &format!("{}: {}\n", k, v).to_string(); // FIXME: perf loss
+            headers_str.push_str(&format!("{}: {}\n", k, v));
         }
         headers_str.push('\n'); // add a space line
         // read file if necessary
