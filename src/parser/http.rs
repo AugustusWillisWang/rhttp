@@ -6,6 +6,8 @@ use std::collections::BTreeMap;
 
 use super::super::BUFFER_SIZE;
 
+mod method;
+
 // Parse HTTP Request
 
 #[derive(Debug, PartialEq)]
@@ -20,27 +22,25 @@ pub enum HttpRequestMethod {
 
 #[derive(Debug)]
 pub struct HttpRequest<'t> {
-    // ref: https://github.com/lennart-bot/lhi/blob/master/src/server/request.rs
-    // It provides the idea to use reference & BTreeMap to track http head entries
+    /// ref: https://github.com/lennart-bot/lhi/blob/master/src/server/request.rs
+    /// It provides the idea to use reference & BTreeMap to track http head entries
     
     pub method: HttpRequestMethod,
     pub url: &'t str, // use reference to avoid copying
     pub version: &'t str, // use reference to avoid copying
-    // pub raw_head: &'t str,
-    // pub raw_body: &'t str,
     pub headers: BTreeMap<String, &'t str>, // Other fields in head, if necessary
     pub body: std::str::Lines<'t>,
     pub size: usize,
-    
-    // ref: https://stackoverflow.com/questions/41034635/idiomatic-transformations-for-string-str-vecu8-and-u8
-    // It talks about trans between vec, u8, str, etc.
 }
 
 impl fmt::Display for HttpRequest<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let req_type = match self.method {
-            HttpRequestMethod::GET  => "GET",
-            // HttpRequestMethod::POST => "POST",
+            HttpRequestMethod::GET     => "GET",
+            HttpRequestMethod::POST    => "POST",
+            HttpRequestMethod::HEAD    => "HEAD",
+            HttpRequestMethod::PUT     => "PUT",
+            HttpRequestMethod::OPTIONS => "OPTIONS",
             _ => "ILLEGAL"
         };
         write!(f, "HttpRequest:\nmethod {}\nurl {}\nversion {}\nheaders {:#?}", req_type, self.url, self.version, self.headers)
@@ -54,6 +54,7 @@ impl<'t> From<&'t str> for HttpRequest<'t> {
     /// ```
     /// let hr = HttpRequest::from(raw_head);
     /// ```
+
     fn from (input: &'t str) -> Self {
         let mut lines = input.lines();
         
@@ -129,14 +130,18 @@ impl HttpRequest<'_> {
 /// HTTP response waiting for sending
 #[derive(Debug)]
 pub struct HttpResponse<'t> {
-    // ref: https://github.com/lennart-bot/lhi/blob/master/src/server/request.rs
-    // It provides the idea to use reference & BTreeMap to track http head entries
+    /// ref: https://github.com/lennart-bot/lhi/blob/master/src/server/request.rs
+    /// It provides the idea to use reference & BTreeMap to track http head entries
+    ///
+    /// ref: https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Messages
+    /// It makes reading RFC much easier
     
-    // ref: https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Messages
     pub status_code: u32,
     pub status_text: &'t str,
-    pub headers: BTreeMap<String, String>, // Other fields in head, if necessary
-    pub body: String,
+    /// <String, String> instead of <String, &str> 
+    pub headers: BTreeMap<String, String>, 
+    /// TODO: switch to buffer
+    pub body: String, 
 }
 
 impl fmt::Display for HttpResponse<'_> {
@@ -147,7 +152,7 @@ impl fmt::Display for HttpResponse<'_> {
 
 impl HttpResponse<'_> {
 
-    fn error_400() -> Self {
+    pub fn error_400() -> Self {
         Self {
             status_code: 400,
             status_text: "Bad Request",
@@ -156,7 +161,7 @@ impl HttpResponse<'_> {
         }
     }
 
-    fn error_404() -> Self {
+    pub fn error_404() -> Self {
         Self {
             status_code: 404,
             status_text: "Not Found",
@@ -165,7 +170,7 @@ impl HttpResponse<'_> {
         }
     }
 
-    fn error_405() -> Self {
+    pub fn error_405() -> Self {
         Self {
             status_code: 405,
             status_text: "Method Not Allowed",
@@ -174,7 +179,7 @@ impl HttpResponse<'_> {
         }
     }
 
-    fn error_500() -> Self {
+    pub fn error_500() -> Self {
         Self {
             status_code: 500,
             status_text: "Internal Server Error",
@@ -183,7 +188,7 @@ impl HttpResponse<'_> {
         }
     }
 
-    fn error_507() -> Self {
+    pub fn error_507() -> Self {
         Self {
             status_code: 507,
             status_text: "Insufficient Storage",
@@ -226,289 +231,23 @@ impl HttpResponse<'_> {
             }
 
             HttpRequestMethod::GET => {
-                // Sending body/payload in a GET request may cause some existing
-                // implementations to reject the request — while not prohibited 
-                // by the specification, the semantics are undefined. 
-                // ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods/GET
-
-                // Warning should be raised if a GET request contains body/payload 
-                if request.body.next() != None {
-                    println!("warning: GET request contains body/payload");
-                }
-
-                // check if requsested resource exists
-                let filename = if request.url == "/" {
-                    format!("{}/index.html", root_dir)
-                } else {
-                    format!("{}/{}", root_dir, request.url)
-                };
-                match fs::File::open(&filename) {
-                    // if resource exists, return 200
-                    Ok(_) => {
-                        let body = fs::read_to_string(&filename).unwrap();
-                        headers.insert("Content-Length".to_string(), body.chars().count().to_string());
-                        return Some( Self {
-                            status_code: 200,
-                            status_text: "OK",
-                            headers: headers,
-                            body: body,
-                        })
-                    } 
-                    // if resource dose not exist, return 404
-                    _ => {
-                        let body = fs::read_to_string(format!("{}/error/404.html", root_dir)).unwrap();
-                        headers.insert("Content-Length".to_string(), body.chars().count().to_string());
-                        return Some( Self {
-                            status_code: 404,
-                            status_text: "NOT FOUND",
-                            headers: headers,
-                            body: body,
-                        })
-                    }
-                }
+                method::generate_get_response(request, headers, root_dir)
             }
-
+            
             HttpRequestMethod::POST => {
-                let raw_length = match request.headers.get("Content-length") {
-                    Some(i) => i,
-                    None => return None,
-                };
-                let length = match raw_length.parse::<usize>() {
-                    Ok(i) => i,
-                    Err(_) => return None,
-                };
-
-                // length check
-                if length >= BUFFER_SIZE {
-                    return Some(HttpResponse::error_507())
-                }
-                
-                let content_type = match request.headers.get("Content-Type") {
-                    Some(i) => i,
-                    _ => return Some(HttpResponse::error_400())
-                };
-                let filename = format!("{}/{}", root_dir, request.url);
-                match content_type {
-                    &"application/x-www-form-urlencoded" => {
-                        let mut content = BTreeMap::<String, &str>::new();
-                        loop {
-                            if let Some(line) = request.body.next() {
-                                let kv_pair = line.split("&");
-                                for i in kv_pair {
-                                    let mut j = i.split("=");
-                                    if let Some(k) = j.next() {
-                                        if let Some(v) = j.next() {
-                                            content.insert(k.to_string(), v);
-                                        }
-                                    }
-                                }
-                            } else {
-                                break;
-                            }
-                        }
-
-                        // TODO: you can add extra data process here 
-                        println!("received kvpairs from POST: {:#?}", content);
-                        
-                        return Some( Self {
-                            status_code: 200,
-                            status_text: "OK",
-                            headers: headers,
-                            body: "".to_string(),
-                        })
-                    },
-                    &"text/plain" => {
-                        // transfer data to server
-                        // get content from request
-                        let mut content = String::new();
-                        loop {
-                            if let Some(i) = request.body.next() {
-                                content = content + i.clone(); // FIXME
-                            } else {
-                                break;
-                            }
-                        }
-                        match fs::File::open(&filename) {
-                            Ok(_) => {
-                                // if resource exists, try to update it
-                                match fs::write(&filename, content) {
-                                    Ok(_) => {
-                                        return Some( Self {
-                                            status_code: 200,
-                                            status_text: "OK",
-                                            headers: headers,
-                                            body: format!("Content-Location: {}", request.url).to_string(),
-                                        })
-                                    }
-                                    _ => {
-                                        return Some(HttpResponse::error_500())
-                                    }
-                                }
-                            } 
-                            // if resource dose not exist, create it
-                            _ => {
-                                match fs::write(&filename, content) {
-                                    Ok(_) => {
-                                        return Some( Self {
-                                            status_code: 201,
-                                            status_text: "Created",
-                                            headers: headers,
-                                            body: format!("Content-Location: {}", request.url).to_string(),
-                                        })
-                                    }
-                                    _ => {
-                                        return Some(HttpResponse::error_500())
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    x => {
-                        if !x.starts_with("multipart/form-data") {
-                            return Some(HttpResponse::error_405())
-                        } else {
-                            // get boundry
-                            let mut value_splited = x.split("boundry=");
-                            let boundry = match value_splited.next() {
-                                Some(_) => {
-                                    match value_splited.next() {
-                                        Some(i) => i,
-                                        _ => return Some(HttpResponse::error_400()) 
-                                    }
-                                },
-                                _ => return Some(HttpResponse::error_400())
-                            };
-                            let mut content = Vec::<String>::new();
-                            let mut new_part = String::new();
-                            while let Some(line) = request.body.next() {
-                                if line.starts_with(&format!("--{}--", boundry)) {
-                                    break
-                                }
-                                if line.starts_with(&format!("--{}", boundry)) && new_part.chars().count() > 0 {
-                                    content.push(new_part.clone()); // content get old new_part 
-                                    new_part = String::new();
-                                } else {
-                                    new_part = new_part + line;
-                                }
-                            }
-                            
-                            // TODO: you can add extra data process here 
-                            println!("received multipart from POST: {:#?}", content);
-                            
-                            return Some( Self {
-                                status_code: 200,
-                                status_text: "OK",
-                                headers: headers,
-                                body: "".to_string(),
-                            })
-                        }
-                    }
-                }
+                method::generate_post_response(request, headers, root_dir)
             }
-
+            
             HttpRequestMethod::PUT => {
-                let raw_length = match request.headers.get("Content-length") {
-                    Some(i) => i,
-                    None => return None,
-                };
-                let length = match raw_length.parse::<usize>() {
-                    Ok(i) => i,
-                    Err(_) => return None,
-                };
-
-                // length check
-                if length >= BUFFER_SIZE {
-                    return Some(HttpResponse::error_507())
-                }
-                // get content from request
-                let mut content = String::new();
-                loop {
-                    if let Some(i) = request.body.next() {
-                        content = content + i.clone(); // FIXME
-                    } else {
-                        break;
-                    }
-                }
-                let filename = format!("{}/{}", root_dir, request.url);
-                match fs::File::open(&filename) {
-                    Ok(_) => {
-                        // if resource exists, try to update it
-                        match fs::write(&filename, content) {
-                            Ok(_) => {
-                                return Some( Self {
-                                    status_code: 200,
-                                    status_text: "OK",
-                                    headers: headers,
-                                    body: format!("Content-Location: {}", request.url).to_string(),
-                                })
-                            }
-                            _ => {
-                                return Some(HttpResponse::error_500())
-                            }
-                        }
-                    } 
-                    // if resource dose not exist, create it
-                    _ => {
-                        match fs::write(&filename, content) {
-                            Ok(_) => {
-                                return Some( Self {
-                                    status_code: 201,
-                                    status_text: "Created",
-                                    headers: headers,
-                                    body: format!("Content-Location: {}", request.url).to_string(),
-                                })
-                            }
-                            _ => {
-                                return Some(HttpResponse::error_500())
-                            }
-                        }
-                    }
-                }
+                method::generate_put_response(request, headers, root_dir)
             }
-
+            
             HttpRequestMethod::HEAD => {
-                // almost the same as GET
-                // check if requsested resource exists
-                let filename = if request.url == "/" {
-                    format!("{}/index.html", root_dir)
-                } else {
-                    format!("{}/{}", root_dir, request.url)
-                };
-                match fs::File::open(&filename) {
-                    // if resource exists, return 200
-                    Ok(_) => {
-                        let body = fs::read_to_string(&filename).unwrap();
-                        headers.insert("Content-Length".to_string(), body.chars().count().to_string());
-                        return Some( Self {
-                            status_code: 200,
-                            status_text: "OK",
-                            headers: headers,
-                            body: "".to_string(),
-                        })
-                    } 
-                    // if resource dose not exist, return 404
-                    _ => {
-                        let body = fs::read_to_string(format!("{}/error/404.html", root_dir)).unwrap();
-                        headers.insert("Content-Length".to_string(), body.chars().count().to_string());
-                        return Some( Self {
-                            status_code: 404,
-                            status_text: "NOT FOUND",
-                            headers: headers,
-                            body: "".to_string(),
-                        })
-                    }
-                }
+                method::generate_head_response(request, headers, root_dir)
             }
-
+            
             HttpRequestMethod::OPTIONS => {
-                // ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods/OPTIONS
-                headers.insert("Allow".to_string(), "OPTIONS, GET, PUT, POST, HEAD".to_string());
-                return Some( Self {
-                    status_code: 204,
-                    status_text: "No Content",
-                    headers: headers,
-                    body: "".to_string(),
-                })
+                method::generate_options_response(request, headers, root_dir)
             }
         }
     }
@@ -526,5 +265,31 @@ impl HttpResponse<'_> {
         headers_str.push('\n'); // add a space line
         // read file if necessary
         String::from(format!("{}{}{}", status_line, headers_str, self.body))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_get_request() {
+        let raw_get = 
+r"GET /favicon.ico HTTP/1.1
+Host: 127.0.0.1:7878
+Connection: keep-alive
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.198 Safari/537.36 Edg/86.0.622.69
+DNT: 1
+Accept: image/webp,image/apng,image/*,*/*;q=0.8
+Sec-Fetch-Site: same-origin
+Sec-Fetch-Mode: no-cors
+Sec-Fetch-Dest: image
+Referer: http://127.0.0.1:7878/
+Accept-Encoding: gzip, deflate, br
+Accept-Language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+Cookie: zentaosid=g9uhstb2uthp5budvqbh6j3d0u
+";
+        let request = HttpRequest::from(raw_get);
+        assert_eq!(request.method, HttpRequestMethod::GET);
     }
 }
