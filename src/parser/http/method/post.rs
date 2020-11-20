@@ -6,13 +6,16 @@ use super::super::*;
 use super::utils::chunk::*;
 
 pub fn generate_post_response<'t>(request: &mut HttpRequest, headers: BTreeMap::<String, String>, root_dir: &str) -> Option<HttpResponse<'t>> {
-    let raw_length = match request.headers.get("Content-length") {
+    let raw_length = match request.headers.get("Content-Length") {
         Some(i) => i,
         None => return None,
     };
     let length = match raw_length.parse::<usize>() {
         Ok(i) => i,
-        Err(_) => return None,
+        Err(_) => {
+            println!("len parse failed");
+            return None
+        },
     };
     
     // length check
@@ -32,7 +35,7 @@ pub fn generate_post_response<'t>(request: &mut HttpRequest, headers: BTreeMap::
     match content_type {
         &"application/x-www-form-urlencoded" => {
             let mut content = BTreeMap::<String, String>::new();
-
+            
             // FIXME: reundent code
             if chunked { // FIXME: perf loss for runtime copying
                 let recovered_string = chunklines_to_string(&mut request.body);

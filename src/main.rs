@@ -74,6 +74,9 @@ extern crate confy;
 extern crate serde_derive;
 extern crate serde;
 
+const BUFFER_SIZE: usize = 4096;
+const DEFAULT_ROOT: &str = "/mnt/c/Workpath/rhttp/page";
+
 #[derive(Debug, Serialize, Deserialize)]
 struct Config {
     /// port binging
@@ -90,12 +93,10 @@ impl Default for Config {
     fn default() -> Self { Self {
         port: 7878,
         thread_number: 4,
-        root_dir: "/mnt/c/Workpath/rhttp/page".into(),
+        root_dir: DEFAULT_ROOT.into(),
         timeout: 4,
     } }
 }
-
-const BUFFER_SIZE: usize = 4096;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "RHTTP", about = "Rust HTTP Server for NW 2020.")]
@@ -221,12 +222,19 @@ fn handle_connection(mut stream: TcpStream, root_dir: &str, timeout: u64) {
                     println!("keep_alive: {}", keep_alive);
                 }
                 println!("{}\n", response);
-                stream.write(response.generate_string().as_bytes()).unwrap();
+                let resp_string = response.generate_string();
+                println!("resp content::\n{}\n", resp_string);
+                stream.write(resp_string.as_bytes()).unwrap();
                 stream.flush().unwrap();
                 println!("response send at {}.", std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH).unwrap().as_secs());
                 if !keep_alive {
                     return;
                 } else {
+                    // if there is still content in buffer and pipleine enabled
+                    // generate new HttpRequest, redo
+                    // TODO
+
+                    // otherwise, setup tcp timeout and wait
                     stream.set_read_timeout(Some(std::time::Duration::new(timeout, 0))).unwrap();
                 }
             }
@@ -235,3 +243,81 @@ fn handle_connection(mut stream: TcpStream, root_dir: &str, timeout: u64) {
     }
 }
     
+#[cfg(test)]
+mod tests {
+    /// # Tips
+    /// 
+    /// Run
+    /// ```
+    /// cargo test -- --nocapture --test get_test
+    /// ```
+    /// to check response in console.
+
+    use super::*;
+
+    /// Generate response string accoding to input request string
+    /// 
+    /// Keep-Alive will be ignored 
+    fn resp_from_req_str(input: &str) -> String {
+        // parse http request
+        let mut request = HttpRequest::from(input);
+        
+        // if keep-alive is not assigned, mark Connection as close
+        let mut keep_alive = true; // keep_alive is opened by default
+        if let Some(connection) = request.headers.get("Connection") {
+            if connection.to_lowercase() != "keep-alive" {
+                keep_alive = false; // invalid header, close it
+            }
+        } else {
+            keep_alive = false;
+        }
+        
+        // generate http response according to require type
+        match HttpResponse::new(&mut request, DEFAULT_ROOT) {
+            Some(mut response) => {
+                // setup Keep-Alive: timeout
+                response.headers.insert("Keep-Alive".to_string(), format!("timeout={}", 4));
+                // if headers.Connection not assigned, assign it automaticly
+                if let Some(resp_keep_alive) = response.headers.get("Connection") {
+                    keep_alive = resp_keep_alive.to_lowercase() == "keep-alive";
+                } else {
+                    let connection_value = if keep_alive { "keep_alive" } else { "close" };
+                    response.headers.insert("Connection".to_string(), connection_value.to_string());
+                    println!("keep_alive: {}", keep_alive);
+                }
+                println!("{}\n", response);
+                println!("response generated at {}.", std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH).unwrap().as_secs());
+                return response.generate_string()
+            }
+            _ => {
+                return "ERROR".to_string()
+                // panic!("server rejected to generate response, tcp cloned")
+            }
+        }
+    }
+
+    #[test]
+    fn get_test () {
+        let raw_req = 
+r"GET / HTTP/1.1
+Host: developer.mozilla.org
+Accept-Language: fr
+";
+        let raw_resp = resp_from_req_str(&raw_req);
+        println!("-----\n{}\n-----\n", raw_resp);
+    }
+    
+    #[test]
+    fn post_test () {
+        let raw_req = 
+    r"POST /contact_form.php HTTP/1.1
+Host: developer.mozilla.org
+Content-Length: 64
+Content-Type: application/x-www-form-urlencoded
+
+name=Joe%20User&request=Send%20me%20one%20of%20your%20catalogue
+";
+        let raw_resp = resp_from_req_str(&raw_req);
+        println!("-----\n{}\n-----\n", raw_resp);
+    }
+}
