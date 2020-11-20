@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use super::super::BUFFER_SIZE;
 use super::super::*;
+use crate::Config;
 
 /// Generate HttpResponse for X method
 /// 
@@ -13,7 +14,9 @@ use super::super::*;
 /// * Return `None` will close the TCP link or do nothing.
 /// 
 /// You can clone this file to introduce new methods to server.
-pub fn generate_get_response<'t>(request: &mut HttpRequest, mut headers: BTreeMap::<String, String>, root_dir: &str) -> Option<HttpResponse<'t>> {
+pub fn generate_get_response<'t>(request: &mut HttpRequest, mut headers: BTreeMap::<String, String>, cfg: &Config) -> Option<HttpResponse<'t>> {
+    let root_dir: &str = &cfg.root_dir;
+
     Some( HttpResponse {
         status_code: 200,
         status_text: "OK",

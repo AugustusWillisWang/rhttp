@@ -6,6 +6,7 @@ use std::fmt;
 use std::collections::BTreeMap;
 
 use super::super::BUFFER_SIZE;
+use super::super::Config;
 
 pub mod method;
 
@@ -210,7 +211,7 @@ impl HttpResponse<'_> {
     /// 
     /// * Return Ok(HttpResponse) if a response is needed
     /// * Return None if no response is required
-    pub fn new(request: &mut HttpRequest, root_dir: &str) -> Option<Self> {
+    pub fn new(request: &mut HttpRequest, cfg: &Config) -> Option<Self> {
         let mut headers = BTreeMap::<String, String>::new();
         
         // Response Headers
@@ -224,23 +225,23 @@ impl HttpResponse<'_> {
             }
 
             HttpRequestMethod::GET => {
-                method::generate_get_response(request, headers, root_dir)
+                method::generate_get_response(request, headers, cfg)
             }
             
             HttpRequestMethod::POST => {
-                method::generate_post_response(request, headers, root_dir)
+                method::generate_post_response(request, headers, cfg)
             }
             
             HttpRequestMethod::PUT => {
-                method::generate_put_response(request, headers, root_dir)
+                method::generate_put_response(request, headers, cfg)
             }
             
             HttpRequestMethod::HEAD => {
-                method::generate_head_response(request, headers, root_dir)
+                method::generate_head_response(request, headers, cfg)
             }
             
             HttpRequestMethod::OPTIONS => {
-                method::generate_options_response(request, headers, root_dir)
+                method::generate_options_response(request, headers, cfg)
             }
         }
     }

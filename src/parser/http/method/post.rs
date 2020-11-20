@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use super::super::BUFFER_SIZE;
 use super::super::*;
 use super::utils::chunk::*;
+use crate::Config;
 
 /// Generate HttpResponse for POST method
 /// 
@@ -13,7 +14,9 @@ use super::utils::chunk::*;
 /// * Return `None` will close the TCP link or do nothing.
 /// 
 /// Extra code/function can be added to deal with post request body.
-pub fn generate_post_response<'t>(request: &mut HttpRequest, headers: BTreeMap::<String, String>, root_dir: &str) -> Option<HttpResponse<'t>> {
+pub fn generate_post_response<'t>(request: &mut HttpRequest, headers: BTreeMap::<String, String>, cfg: &Config) -> Option<HttpResponse<'t>> {
+    let root_dir: &str = &cfg.root_dir;
+
     let raw_length = match request.headers.get("Content-Length") {
         Some(i) => i,
         None => return None,

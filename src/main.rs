@@ -127,8 +127,8 @@ pub const BUFFER_SIZE: usize = 32768;
 pub const DEFAULT_ROOT: &str = "/mnt/c/Workpath/rhttp/page";
 
 /// Global config file, shared by all threads
-#[derive(Debug, Serialize, Deserialize)]
-struct Config {
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Config {
     /// port binging
     port: u32,
     /// max number of threads created in the thread pool
@@ -137,6 +137,8 @@ struct Config {
     root_dir: String, 
     /// timeout unit: secs
     timeout: i64, 
+    /// enable chunk
+    chunk: bool, 
 }
 
 impl Default for Config {
@@ -145,6 +147,7 @@ impl Default for Config {
         thread_number: 4,
         root_dir: DEFAULT_ROOT.into(),
         timeout: 1,
+        chunk: false,
     } }
 }
 
@@ -214,10 +217,9 @@ fn main() {
     loop {
         for stream in listener.incoming().take(2) {
             let stream = stream.unwrap();
-            let root_dir = cfg.root_dir.clone();
-            let timeout = cfg.timeout as u64;
+            let cfg_cp = cfg.clone();
             pool.execute(move || {
-                handle_connection(stream, &root_dir, timeout);
+                handle_connection(stream, cfg_cp);
             });
         }
     }
@@ -231,7 +233,9 @@ fn main() {
 /// When a new TCP link established, give it to handle_connection in a free worker.
 /// 
 /// Returning from this function will close TCP link.
-fn handle_connection(mut stream: TcpStream, root_dir: &str, timeout: u64) {
+fn handle_connection(mut stream: TcpStream, cfg: Config) {
+    let root_dir: &str = &cfg.root_dir;
+    let timeout: u64 = cfg.timeout as u64;
     loop{
         let mut buffer = [0; BUFFER_SIZE];
         match stream.read(&mut buffer) {
@@ -266,7 +270,7 @@ fn handle_connection(mut stream: TcpStream, root_dir: &str, timeout: u64) {
         }
         
         // generate http response according to require type
-        match HttpResponse::new(&mut request, root_dir) {
+        match HttpResponse::new(&mut request, &cfg) {
 
             Some(mut response) => {
                 // setup Keep-Alive: timeout

@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 
 use super::super::BUFFER_SIZE;
 use super::super::*;
+use crate::Config;
 
 /// Generate HttpResponse for PUT method
 /// 
@@ -10,7 +11,9 @@ use super::super::*;
 /// 
 /// * Return `Some(HttpResponse)` if a http response is required.
 /// * Return `None` will close the TCP link or do nothing.
-pub fn generate_put_response<'t>(request: &mut HttpRequest, headers: BTreeMap::<String, String>, root_dir: &str) -> Option<HttpResponse<'t>> {
+pub fn generate_put_response<'t>(request: &mut HttpRequest, headers: BTreeMap::<String, String>, cfg: &Config) -> Option<HttpResponse<'t>> {
+    let root_dir: &str = &cfg.root_dir;
+
     let raw_length = match request.headers.get("Content-length") {
         Some(i) => i,
         None => return None,
