@@ -22,6 +22,35 @@ pub fn string_to_chunk(input: &str) -> String {
     s
 }
 
+pub fn vec_to_chunk(input: &Vec<u8>) -> Vec<u8> {
+    let len = input.len();
+    let mut pos = 0;
+    let mut s = Vec::<u8>::new();
+    let chunksize = 8;
+    
+    while pos < len {
+        if pos % chunksize == 0 {
+            s.push(b'\r');
+            s.push(b'\n');
+            if pos + chunksize >= len {
+                s.push((len - pos) as u8 + b'0');
+            } else {
+                s.push(chunksize as u8 + b'0');
+            }
+            s.push(b'\r');
+            s.push(b'\n');
+        }
+        s.push(input[pos]);
+        pos += 1;
+    }
+    s.push(b'\r');
+    s.push(b'\n');
+    s.push(b'0');
+    s.push(b'\r');
+    s.push(b'\n');
+    s
+}
+
 pub fn chunklines_to_string(lines: &mut std::str::Lines) -> String {
     let mut s = String::new();    
     loop {

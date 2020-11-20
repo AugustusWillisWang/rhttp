@@ -38,7 +38,7 @@
 /// * HTTP分块传输 [NEED UPDATE]
 /// * 支持HTTP持久连接 [DONE]
 ///     ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Connection_management_in_HTTP_1.x
-/// * 支持HTTP持久连接管道 
+/// * 支持HTTP持久连接管道 [DELAYED]
 /// * Use lib to deal with HTTPS Request
 ///     * openssl [DONE]
 ///     * 浏览器兼容性问题
@@ -69,6 +69,8 @@ pub use tpool::*;
 
 pub mod parser; // parser for http head
 pub use parser::http::*; // import http head data structure
+
+use parser::http::method::utils::chunk::*;
 
 // use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use structopt::StructOpt;
@@ -160,7 +162,7 @@ fn main() {
     // prepare TCP port and thread pool
     let listener = TcpListener::bind(format!("127.0.0.1:{}", cfg.port)).unwrap();
     let pool = ThreadPool::new(cfg.thread_number);
-
+    
     // when new TCP request incomes, handle_connection
     loop {
         for stream in listener.incoming().take(2) {
@@ -213,6 +215,7 @@ fn handle_connection(mut stream: TcpStream, root_dir: &str, timeout: u64) {
         
         // generate http response according to require type
         match HttpResponse::new(&mut request, root_dir) {
+
             Some(mut response) => {
                 // setup Keep-Alive: timeout
                 response.headers.insert("Keep-Alive".to_string(), format!("timeout={}", timeout));
@@ -232,6 +235,7 @@ fn handle_connection(mut stream: TcpStream, root_dir: &str, timeout: u64) {
                     let filename = format!("{}/{}", root_dir, request.url);
                     match std::fs::read(filename) {
                         Ok(i) => {
+                            // stream.write(&vec_to_chunk(&i)).unwrap();
                             stream.write(&i).unwrap();
                             println!("--raw file omited--")
                         },

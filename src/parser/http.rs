@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use super::super::BUFFER_SIZE;
 
-mod method;
+pub mod method;
 
 // Parse HTTP Request
 
