@@ -122,7 +122,7 @@ extern crate serde_derive;
 extern crate serde;
 
 /// Request buffer size
-pub const BUFFER_SIZE: usize = 4096;
+pub const BUFFER_SIZE: usize = 32768;
 /// Default page root path
 pub const DEFAULT_ROOT: &str = "/mnt/c/Workpath/rhttp/page";
 
