@@ -2,6 +2,7 @@ use std::fs;
 use std::collections::BTreeMap;
 
 use super::super::*;
+use crate::Config;
 
 // use super::utils::chunk::*;
 
@@ -14,7 +15,9 @@ use super::super::*;
 ///
 /// * Return `Some(HttpResponse)` if a http response is required.
 /// * Return `None` will close the TCP link or do nothing.
-pub fn generate_get_response<'t>(request: &mut HttpRequest, mut headers: BTreeMap::<String, String>, root_dir: &str) -> Option<HttpResponse<'t>> {
+pub fn generate_get_response<'t>(request: &mut HttpRequest, mut headers: BTreeMap::<String, String>, cfg: &Config) -> Option<HttpResponse<'t>> {
+    let root_dir: &str = &cfg.root_dir;
+
     // Sending body/payload in a GET request may cause some existing
     // implementations to reject the request — while not prohibited 
     // by the specification, the semantics are undefined. 

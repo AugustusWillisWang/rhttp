@@ -131,8 +131,8 @@ pub const BUFFER_SIZE: usize = 32768;
 pub const DEFAULT_ROOT: &str = "/home/lfz/Videos/rhttp/page";
 
 /// Global config file, shared by all threads
-#[derive(Debug, Serialize, Deserialize)]
-struct Config {
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Config {
     /// port binging
     port: u32,
     /// max number of threads created in the thread pool
@@ -141,6 +141,8 @@ struct Config {
     root_dir: String, 
     /// timeout unit: secs
     timeout: i64, 
+    /// enable chunk
+    chunk: bool, 
 }
 
 impl Default for Config {
@@ -148,7 +150,8 @@ impl Default for Config {
         port: 7878,
         thread_number: 4,
         root_dir: DEFAULT_ROOT.into(),
-        timeout: 4,
+        timeout: 1,
+        chunk: false,
     } }
 }
 
@@ -228,10 +231,9 @@ fn main() {
                 Ok(stream) => {
                     let acceptor = acceptor.clone();
                     let stream = acceptor.accept(stream).unwrap();
-                    let root_dir = cfg.root_dir.clone();
-                    let timeout = cfg.timeout as u64;
+                    let cfg_cp = cfg.clone();
                     pool.execute(move || {
-                        handle_connection(stream, &root_dir, timeout);
+                        handle_connection(stream, cfg_cp);
                     });
                 }
                 Err(_e) => { /* connection failed */ }
@@ -248,7 +250,10 @@ fn main() {
 /// When a new TCP link established, give it to handle_connection in a free worker.
 /// 
 /// Returning from this function will close TCP link.
-fn handle_connection(mut stream: SslStream<TcpStream>, root_dir: &str, timeout: u64) {
+
+fn handle_connection(mut stream: SslStream<TcpStream>, cfg: Config) {
+    let root_dir: &str = &cfg.root_dir;
+    let timeout: u64 = cfg.timeout as u64;
     loop{
         let mut buffer = [0; BUFFER_SIZE];
         match stream.read(&mut buffer) {
@@ -283,7 +288,7 @@ fn handle_connection(mut stream: SslStream<TcpStream>, root_dir: &str, timeout: 
         }
         
         // generate http response according to require type
-        match HttpResponse::new(&mut request, root_dir) {
+        match HttpResponse::new(&mut request, &cfg) {
 
             Some(mut response) => {
                 // setup Keep-Alive: timeout
@@ -345,7 +350,7 @@ mod tests {
     /// For example:
     /// 
     /// ```
-    /// cargo test -- --nocapture --test <get_test>
+    /// cargo test -- --nocapture --test post_test
     /// ```
     
     use super::*;
@@ -371,8 +376,10 @@ mod tests {
             keep_alive = false;
         }
         
+        let cfg: Config = Default::default();
+
         // generate http response according to require type
-        match HttpResponse::new(&mut request, DEFAULT_ROOT) {
+        match HttpResponse::new(&mut request, &cfg) {
             Some(mut response) => {
                 // setup Keep-Alive: timeout
                 response.headers.insert("Keep-Alive".to_string(), format!("timeout={}", 4));
@@ -411,11 +418,11 @@ mod tests {
     fn post_test () {
         let raw_req = 
         r"POST /contact_form.php HTTP/1.1
-        Host: developer.mozilla.org
-        Content-Length: 64
-        Content-Type: application/x-www-form-urlencoded
+Host: developer.mozilla.org
+Content-Length: 64
+Content-Type: application/x-www-form-urlencoded
         
-        name=Joe%20User&request=Send%20me%20one%20of%20your%20catalogue
+name=Joe%20User&request=Send%20me%20one%20of%20your%20catalogue
         ";
         let raw_resp = resp_from_req_str(&raw_req);
         println!("-----\n{}\n-----\n", raw_resp);
