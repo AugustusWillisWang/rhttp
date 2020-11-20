@@ -358,8 +358,10 @@ mod tests {
             keep_alive = false;
         }
         
+        let cfg: Config = Default::default();
+
         // generate http response according to require type
-        match HttpResponse::new(&mut request, DEFAULT_ROOT) {
+        match HttpResponse::new(&mut request, &cfg) {
             Some(mut response) => {
                 // setup Keep-Alive: timeout
                 response.headers.insert("Keep-Alive".to_string(), format!("timeout={}", 4));
