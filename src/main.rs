@@ -21,25 +21,28 @@
 //! * 详细实现POST方法中对Content-Type的支持: 支持使用POST传输文件: [DONE] 
 //!     * ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
 //!     * multipart/form-data暂不准备实现 [DONE]
-//!     * 文件传输测试
-//! * 分块传输支持
+//!     * 文件传输测试 [DONE]
+//! * 分块传输支持 [UPDATE NEEDED]
 //!     * ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Transfer-Encoding
-//!     * 分块传输解析
-//!         * Transfer-Encoding: chunked
-//!         * New API
+//!     * 分块传输解析 [DONE]
+//!         * Transfer-Encoding: chunked [DONE]
 //! * Keep-alive [DONE]
 //! * Pipelined
 //! * HTTPS
 
 /// 要求列表
 /// * HTTP Get [DONE]
-/// * HTTP Post
-/// * Upload
-/// * Download
-/// * HTTP分块传输
-/// * 支持HTTP持久连接和管道 ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Connection_management_in_HTTP_1.x
+/// * HTTP Post [DONE]
+/// * Upload [DONE]
+/// * Download [DONE]
+/// * HTTP分块传输 [NEED UPDATE]
+/// * 支持HTTP持久连接 [DONE]
+///     ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Connection_management_in_HTTP_1.x
+/// * 支持HTTP持久连接管道 
 /// * Use lib to deal with HTTPS Request
-///     * openssl or others?
+///     * openssl [DONE]
+///     * 浏览器兼容性问题
+///         * 测试时用`firefox`吧
 /// * multithread [DONE]
 
 /// RUST related opt
@@ -48,8 +51,8 @@
 ///     * ref: http://llever.com/CliInput-wg-zh/tutorial/output.zh.html
 /// * structopt for CliInput parameter parsing [DONE]
 /// * confy for Serialize/Deserialize config [DONE]
-/// * refactor: let reader = BufReader::new(&stream);
-/// * refactor: let mut writer = BufWriter::new(&stream);
+/// * refactor: let reader = BufReader::new(&stream); [IGNORED]
+/// * refactor: let mut writer = BufWriter::new(&stream); [IGNORED]
 
 /// HTTP Standard Reference
 /// ref: https://developer.mozilla.org/en-US/docs/Web/HTTP
@@ -61,11 +64,11 @@ use std::net::TcpStream;
 // use std::thread;
 // use std::time::Duration;
 
-mod tpool;
-use tpool::*;
+pub mod tpool;
+pub use tpool::*;
 
-mod parser; // parser for http head
-use parser::http::*; // import http head data structure
+pub mod parser; // parser for http head
+pub use parser::http::*; // import http head data structure
 
 // use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use structopt::StructOpt;
@@ -74,8 +77,8 @@ extern crate confy;
 extern crate serde_derive;
 extern crate serde;
 
-const BUFFER_SIZE: usize = 4096;
-const DEFAULT_ROOT: &str = "/mnt/c/Workpath/rhttp/page";
+pub const BUFFER_SIZE: usize = 4096;
+pub const DEFAULT_ROOT: &str = "/mnt/c/Workpath/rhttp/page";
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Config {
@@ -225,6 +228,19 @@ fn handle_connection(mut stream: TcpStream, root_dir: &str, timeout: u64) {
                 let resp_string = response.generate_string();
                 println!("resp content::\n{}\n", resp_string);
                 stream.write(resp_string.as_bytes()).unwrap();
+                if response.need_send_raw_file() {
+                    let filename = format!("{}/{}", root_dir, request.url);
+                    match std::fs::read(filename) {
+                        Ok(i) => {
+                            stream.write(&i).unwrap();
+                            println!("--raw file omited--")
+                        },
+                        Err(_) => {
+                            // File may be removed by other threads, just ignore it or return
+                            return
+                        } 
+                    }
+                }
                 stream.flush().unwrap();
                 println!("response send at {}.", std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH).unwrap().as_secs());
                 if !keep_alive {
@@ -278,8 +294,7 @@ mod tests {
                 // setup Keep-Alive: timeout
                 response.headers.insert("Keep-Alive".to_string(), format!("timeout={}", 4));
                 // if headers.Connection not assigned, assign it automaticly
-                if let Some(resp_keep_alive) = response.headers.get("Connection") {
-                    keep_alive = resp_keep_alive.to_lowercase() == "keep-alive";
+                if let Some(_) = response.headers.get("Connection") {
                 } else {
                     let connection_value = if keep_alive { "keep_alive" } else { "close" };
                     response.headers.insert("Connection".to_string(), connection_value.to_string());

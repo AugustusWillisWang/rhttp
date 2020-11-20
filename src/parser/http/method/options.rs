@@ -9,6 +9,6 @@ pub fn generate_options_response<'t>(_request: &mut HttpRequest, mut headers: BT
         status_code: 204,
         status_text: "No Content",
         headers: headers,
-        body: "".to_string(),
+        body: Some("".to_string()),
     })
 }

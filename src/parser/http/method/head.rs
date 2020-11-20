@@ -20,7 +20,7 @@ pub fn generate_head_response<'t>(request: &mut HttpRequest, mut headers: BTreeM
                 status_code: 200,
                 status_text: "OK",
                 headers: headers,
-                body: "".to_string(),
+                body: Some("".to_string()),
             })
         } 
         // if resource dose not exist, return 404
@@ -31,7 +31,7 @@ pub fn generate_head_response<'t>(request: &mut HttpRequest, mut headers: BTreeM
                 status_code: 404,
                 status_text: "NOT FOUND",
                 headers: headers,
-                body: "".to_string(),
+                body: Some("".to_string()),
             })
         }
     }

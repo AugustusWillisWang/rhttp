@@ -80,7 +80,7 @@ pub fn generate_post_response<'t>(request: &mut HttpRequest, headers: BTreeMap::
                 status_code: 200,
                 status_text: "OK",
                 headers: headers,
-                body: "".to_string(),
+                body: Some("".to_string()),
             })
         },
         &"text/plain" => {
@@ -110,7 +110,7 @@ pub fn generate_post_response<'t>(request: &mut HttpRequest, headers: BTreeMap::
                                 status_code: 200,
                                 status_text: "OK",
                                 headers: headers,
-                                body: format!("Content-Location: {}", request.url).to_string(),
+                                body: Some(format!("Content-Location: {}", request.url).to_string()),
                             })
                         }
                         _ => {
@@ -126,7 +126,7 @@ pub fn generate_post_response<'t>(request: &mut HttpRequest, headers: BTreeMap::
                                 status_code: 201,
                                 status_text: "Created",
                                 headers: headers,
-                                body: format!("Content-Location: {}", request.url).to_string(),
+                                body: Some(format!("Content-Location: {}", request.url).to_string()),
                             })
                         }
                         _ => {
@@ -192,7 +192,7 @@ pub fn generate_post_response<'t>(request: &mut HttpRequest, headers: BTreeMap::
                     status_code: 200,
                     status_text: "OK",
                     headers: headers,
-                    body: "".to_string(),
+                    body: Some("".to_string()),
                 })
             }
         }
