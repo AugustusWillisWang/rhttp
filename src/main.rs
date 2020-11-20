@@ -58,6 +58,7 @@
 use std::io::prelude::*;
 use std::net::TcpListener;
 use std::net::TcpStream;
+use std::io::BufReader;
 // use std::thread;
 // use std::time::Duration;
 
@@ -174,27 +175,10 @@ fn main() {
 }
 
 fn handle_connection(mut stream: TcpStream, root_dir: &str, timeout: u64) {
+    let mut buf_lines = BufReader::new(stream.try_clone().expect("stream clone failed")).lines();
     loop{
-        let mut buffer = [0; BUFFER_SIZE];
-        match stream.read(&mut buffer) {
-            Err(_) => { 
-                // TCP timeout, close TCP link
-                println!("keep-alive timeout, close TCP link.");
-                return 
-            } 
-            _ => {}
-        }
-        
-        // ref: https://stackoverflow.com/questions/60070627/does-stringfrom-utf8-lossy-allocate-memory
-        // > If our byte slice is invalid UTF-8, then we need to insert the replacement characters, 
-        // > which will change the size of the string, and hence, require a String. 
-        // > But if it's already valid UTF-8, we don't need a new allocation. 
-        // > This return type allows us to handle both cases.
-        println!("Raw request:\n{}", String::from_utf8_lossy(&buffer[..]));
-        let buf_str = &String::from_utf8_lossy(&buffer[..]);
-        
         // parse http request
-        let mut request = HttpRequest::from(buf_str as &str); // from_utf8_lossy returns a Cow<'a, str>, use as to make compiler happy
+        let mut request = HttpRequest::from(buf_lines); // from_utf8_lossy returns a Cow<'a, str>, use as to make compiler happy
         // println!("{}", request);
         
         // if keep-alive is not assigned, mark Connection as close
@@ -231,7 +215,8 @@ fn handle_connection(mut stream: TcpStream, root_dir: &str, timeout: u64) {
                 }
             }
             _ => return // TCP will also be closed
-        } 
+        }
+        buf_lines = request.body;
     }
 }
     

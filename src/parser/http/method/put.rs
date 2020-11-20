@@ -22,9 +22,9 @@ pub fn generate_put_response<'t>(request: &mut HttpRequest, headers: BTreeMap::<
     let mut content = String::new();
     let mut newline = false;
     loop {
-        if let Some(i) = request.body.next() {
+        if let Some(Ok(i)) = request.body.next() {
             if newline { content.push_str("\n") };
-            content.push_str(i);
+            content.push_str(&i);
             newline = true;
         } else {
             break;

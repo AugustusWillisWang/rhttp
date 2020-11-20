@@ -55,7 +55,7 @@ pub fn generate_post_response<'t>(request: &mut HttpRequest, headers: BTreeMap::
             } else {
                 loop {
                     if let Some(line) = request.body.next() {
-                        let kv_pair = line.split("&");
+                        let kv_pair = line.unwrap().split("&"); //FIXME
                         for i in kv_pair {
                             let mut j = i.split("=");
                             if let Some(k) = j.next() {
@@ -89,9 +89,9 @@ pub fn generate_post_response<'t>(request: &mut HttpRequest, headers: BTreeMap::
                 content = chunklines_to_string(&mut request.body);
             } else {
                 loop {
-                    if let Some(i) = request.body.next() {
+                    if let Some(Ok(i)) = request.body.next() {
                         if newline { content.push_str("\n") };
-                        content.push_str(i);
+                        content.push_str(&i);
                         newline = true;
                     } else {
                         break;
@@ -168,7 +168,7 @@ pub fn generate_post_response<'t>(request: &mut HttpRequest, headers: BTreeMap::
                         }
                     }
                 } else {
-                    while let Some(line) = request.body.next() {
+                    while let Some(Ok(line)) = request.body.next() {
                         if line.starts_with(&format!("--{}--", boundry)) {
                             break
                         }
@@ -176,7 +176,7 @@ pub fn generate_post_response<'t>(request: &mut HttpRequest, headers: BTreeMap::
                             content.push(new_part.clone()); // content get old new_part 
                             new_part = String::new();
                         } else {
-                            new_part.push_str(line);
+                            new_part.push_str(&line);
                             new_part.push_str("\n");
                         }
                     }

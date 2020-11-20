@@ -1,3 +1,5 @@
+use crate::parser::http::TcpLine;
+
 pub fn string_to_chunk(input: &str) -> String {
     let len = input.chars().count();
     let mut pos = 0;
@@ -22,7 +24,7 @@ pub fn string_to_chunk(input: &str) -> String {
     s
 }
 
-pub fn chunklines_to_string(lines: &mut std::str::Lines) -> String {
+pub fn chunklines_to_string(lines: &mut TcpLine) -> String {
     let mut s = String::new();    
     loop {
         let mut _len = 0; // use _ prefix to stop rustc from complaining
@@ -31,7 +33,7 @@ pub fn chunklines_to_string(lines: &mut std::str::Lines) -> String {
         match lines.next() {
             Some(i) => {
                 // read hex
-                match usize::from_str_radix(i, 16) {
+                match usize::from_str_radix(&i.unwrap(), 16) { // FIXME
                     Ok(v) => { 
                         if v == 0 { break }
                         _len = v; 
@@ -43,9 +45,9 @@ pub fn chunklines_to_string(lines: &mut std::str::Lines) -> String {
         }
         // read content
         match lines.next() {
-            Some(j) => {
+            Some(Ok(j)) => {
                 if j.chars().count() == _len {
-                    s.push_str(j);
+                    s.push_str(&j);
                 } else {
                     println!("chunk len {} and real len {} does not match", _len, j.chars().count());
                     break
