@@ -4,6 +4,12 @@ use std::collections::BTreeMap;
 use super::super::BUFFER_SIZE;
 use super::super::*;
 
+/// Generate HttpResponse for PUT method
+/// 
+/// Some final work is done by `handle_connection`
+/// 
+/// * Return `Some(HttpResponse)` if a http response is required.
+/// * Return `None` will close the TCP link or do nothing.
 pub fn generate_put_response<'t>(request: &mut HttpRequest, headers: BTreeMap::<String, String>, root_dir: &str) -> Option<HttpResponse<'t>> {
     let raw_length = match request.headers.get("Content-length") {
         Some(i) => i,

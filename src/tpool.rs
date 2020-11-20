@@ -1,9 +1,11 @@
+//! ThreadPool implementation
+//! 
+//! ref: https://doc.rust-lang.org/book/ch20-02-multithreaded.html
+//! 
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
-
-// ThreadPool implementation
 
 pub struct ThreadPool {
     workers: Vec<Worker>,

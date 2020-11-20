@@ -1,4 +1,6 @@
-/// HTTP Request / Response Parser
+//! HTTP Request / Response Parser
+//! 
+//! Parse HTTP request, generate HTTP response.
 
 use std::fmt;
 use std::collections::BTreeMap;
@@ -19,11 +21,15 @@ pub enum HttpRequestMethod {
     ILLEGAL, // -> Ignored
 }
 
+/// Parsed HTTP request
+/// 
+/// Many references are used to reduce copy cost
+/// 
+/// ref: https://github.com/lennart-bot/lhi/blob/master/src/server/request.rs
+/// 
+/// It provides the idea to use reference & BTreeMap to track http head entries
 #[derive(Debug)]
 pub struct HttpRequest<'t> {
-    /// ref: https://github.com/lennart-bot/lhi/blob/master/src/server/request.rs
-    /// It provides the idea to use reference & BTreeMap to track http head entries
-    
     pub method: HttpRequestMethod,
     pub url: &'t str, // use reference to avoid copying
     pub version: &'t str, // use reference to avoid copying
@@ -127,13 +133,16 @@ impl HttpRequest<'_> {
 // Parse HTTP Response
 
 /// HTTP response waiting for sending
+/// 
+/// ref: https://github.com/lennart-bot/lhi/blob/master/src/server/request.rs
+/// 
+/// It provides the idea to use reference & BTreeMap to track http head entries
+///
+/// ref: https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Messages
+/// 
+/// It makes reading RFC much easier
 #[derive(Debug)]
 pub struct HttpResponse<'t> {
-    /// ref: https://github.com/lennart-bot/lhi/blob/master/src/server/request.rs
-    /// It provides the idea to use reference & BTreeMap to track http head entries
-    ///
-    /// ref: https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Messages
-    /// It makes reading RFC much easier
     
     pub status_code: u32,
     pub status_text: &'t str,
@@ -199,30 +208,14 @@ impl HttpResponse<'_> {
 
     /// Generate HttpResponse from HttpRequest
     /// 
-    /// Return Ok(HttpResponse) if a response is needed
-    /// Return None if no response is required
+    /// * Return Ok(HttpResponse) if a response is needed
+    /// * Return None if no response is required
     pub fn new(request: &mut HttpRequest, root_dir: &str) -> Option<Self> {
-        // let status_code =  404;
-        // let status_text = "Undefined Interal Error";
         let mut headers = BTreeMap::<String, String>::new();
-        // let body = "Undefined Interal Error Resp Body";
         
         // Response Headers
         headers.insert("Server".to_string(), "rhttp".to_string());
         
-        // Entity Headers
-        // TODO: Content-Type
-
-        // General Headers
-        // TODO: Connection
-        // TODO: Keep-Alive
-        
-        // body_type match ... {...}
-        // TODO: Content-Type
-        // TODO: Content-Length
-        // TODO: Transfer-Encoding
-        // Ignored: Multiple-resource bodies
-
         // HttpRequest match
         match request.method {
             HttpRequestMethod::ILLEGAL => {
@@ -261,9 +254,6 @@ impl HttpResponse<'_> {
     pub fn generate_string(&self) -> String {
         let status_line = format!("HTTP/1.1 {} {}\n", self.status_code, self.status_text);
         let mut headers_str = String::new();
-        // TODO: use vec, and use vec.resource(1024) to pre allocate space
-        // body.size may help 
-        // headers_str.resource(1024);
         for (k, v) in &self.headers {
             headers_str.push_str(&format!("{}: {}\n", k, v));
         }

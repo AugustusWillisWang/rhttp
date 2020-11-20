@@ -1,8 +1,50 @@
 //! RHTTP
+//! =====
 //! 
 //! Rust HTTP Server for NW 2020
 //! 
-//! TODO List
+//! ---
+//!
+//! # Features
+//! 
+//! Methods Supported:
+//! 
+//! * GET
+//! * PUT
+//! * POST
+//! * HEAD
+//! * OPTIONS
+//! 
+//! Other features:
+//! 
+//! * keep-alive support
+//! * chunk support
+//! * multi-thread using built-in thread pool
+//! * HTTPS\* (https branch)
+//! 
+//! # Usage
+//! 
+//! ```
+//! rhttp [OPTIONS]
+//! 
+//! FLAGS:
+//!     -h, --help       Prints help information
+//!     -V, --version    Prints version information
+//! 
+//! OPTIONS:
+//!         --load-config <load-config>...        Use config [default: 0]
+//!     -p, --port <port>                         Set port [default: 0]
+//!     -r, --root-dir <server_root_dir>          Set server root dir [default: ]
+//!     -j, --thread <thread-number>              Set number of threads [default: 0]
+//!     -t, --timeout <timeout>                   Set timeout limit [default: -1]
+//!         --update-config <update-config>...    Update config without running the real server [default: 0]
+//!     -v <verbose>...                           Verbosity level [default: 0]
+//! ```
+//! 
+//! HTML files should be placed in `/page` dir.
+//! 
+//! # TODO List
+//! 
 //! * 完善HTTP Req框架 [DONE]
 //!     * 添加Header处理 [DONE]
 //! * 实现HTTP Resp框架 [DONE]
@@ -20,7 +62,7 @@
 //!     * RUST使用TCP发送数据可参考: https://blog.csdn.net/lcloveyou/article/details/105755676
 //! * 详细实现POST方法中对Content-Type的支持: 支持使用POST传输文件: [DONE] 
 //!     * ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
-//!     * multipart/form-data暂不准备实现 [DONE]
+//!     * multipart/form-data [DONE]
 //!     * 文件传输测试 [DONE]
 //! * 分块传输支持 [UPDATE NEEDED]
 //!     * ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Transfer-Encoding
@@ -79,9 +121,12 @@ extern crate confy;
 extern crate serde_derive;
 extern crate serde;
 
+/// Request buffer size
 pub const BUFFER_SIZE: usize = 4096;
+/// Default page root path
 pub const DEFAULT_ROOT: &str = "/mnt/c/Workpath/rhttp/page";
 
+/// Global config file, shared by all threads
 #[derive(Debug, Serialize, Deserialize)]
 struct Config {
     /// port binging
@@ -103,6 +148,7 @@ impl Default for Config {
     } }
 }
 
+/// Command-line parameters
 #[derive(Debug, StructOpt)]
 #[structopt(name = "RHTTP", about = "Rust HTTP Server for NW 2020.")]
 struct CliInput {
@@ -130,6 +176,7 @@ struct CliInput {
     root_dir: String,
 }
 
+/// Entry
 fn main() {
     // setup config
     let args = CliInput::from_args();
@@ -179,6 +226,11 @@ fn main() {
     // println!("Shutting down.");
 }
 
+/// Main function to handle http connection
+/// 
+/// When a new TCP link established, give it to handle_connection in a free worker.
+/// 
+/// Returning from this function will close TCP link.
 fn handle_connection(mut stream: TcpStream, root_dir: &str, timeout: u64) {
     loop{
         let mut buffer = [0; BUFFER_SIZE];
@@ -269,15 +321,25 @@ mod tests {
     /// 
     /// Run
     /// ```
-    /// cargo test -- --nocapture --test get_test
+    /// cargo test -- --nocapture --test <test_name>
     /// ```
     /// to check response in console.
-
+    /// 
+    /// For example:
+    /// 
+    /// ```
+    /// cargo test -- --nocapture --test <get_test>
+    /// ```
+    
     use super::*;
 
     /// Generate response string accoding to input request string
     /// 
-    /// Keep-Alive will be ignored 
+    /// It is a copy of handle_connection, we use &str as input. 
+    /// Thus we do not to deal with TCP in this unittest.
+    /// 
+    /// * All TCP-related ops are removed.
+    /// * Keep-Alive will be ignored.
     fn resp_from_req_str(input: &str) -> String {
         // parse http request
         let mut request = HttpRequest::from(input);
@@ -315,31 +377,34 @@ mod tests {
         }
     }
 
+    /// Test basic GET method
     #[test]
     fn get_test () {
         let raw_req = 
-r"GET / HTTP/1.1
-Host: developer.mozilla.org
-Accept-Language: fr
-";
+        r"GET / HTTP/1.1
+        Host: developer.mozilla.org
+        Accept-Language: fr
+        ";
         let raw_resp = resp_from_req_str(&raw_req);
         println!("-----\n{}\n-----\n", raw_resp);
     }
     
+    /// Test basic POST method
     #[test]
     fn post_test () {
         let raw_req = 
-    r"POST /contact_form.php HTTP/1.1
-Host: developer.mozilla.org
-Content-Length: 64
-Content-Type: application/x-www-form-urlencoded
-
-name=Joe%20User&request=Send%20me%20one%20of%20your%20catalogue
-";
+        r"POST /contact_form.php HTTP/1.1
+        Host: developer.mozilla.org
+        Content-Length: 64
+        Content-Type: application/x-www-form-urlencoded
+        
+        name=Joe%20User&request=Send%20me%20one%20of%20your%20catalogue
+        ";
         let raw_resp = resp_from_req_str(&raw_req);
         println!("-----\n{}\n-----\n", raw_resp);
     }
-
+    
+    /// Use POST method to upload a file
     #[test]
     fn post_file_test () {
         let raw_req = 

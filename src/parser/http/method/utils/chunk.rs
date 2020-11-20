@@ -1,3 +1,8 @@
+//! Chunk encode & decode lib
+
+/// Generate a new chunked `String` from &str
+/// 
+/// Can be used to generate chunked data from `String`.
 pub fn string_to_chunk(input: &str) -> String {
     let len = input.chars().count();
     let mut pos = 0;
@@ -22,6 +27,9 @@ pub fn string_to_chunk(input: &str) -> String {
     s
 }
 
+/// Generate a new chunked `String` from &Vec<u8>
+/// 
+/// Can be used to generate chunked data from binary file.
 pub fn vec_to_chunk(input: &Vec<u8>) -> Vec<u8> {
     let len = input.len();
     let mut pos = 0;
@@ -51,6 +59,11 @@ pub fn vec_to_chunk(input: &Vec<u8>) -> Vec<u8> {
     s
 }
 
+/// Generate a new chunked `String` from &Vec<u8>
+/// 
+/// Can be used to generate chunked data from line iterator.
+/// 
+/// Outdated.
 pub fn chunklines_to_string(lines: &mut std::str::Lines) -> String {
     let mut s = String::new();    
     loop {

@@ -5,6 +5,14 @@ use super::super::BUFFER_SIZE;
 use super::super::*;
 use super::utils::chunk::*;
 
+/// Generate HttpResponse for POST method
+/// 
+/// Some final work is done by `handle_connection`
+/// 
+/// * Return `Some(HttpResponse)` if a http response is required.
+/// * Return `None` will close the TCP link or do nothing.
+/// 
+/// Extra code/function can be added to deal with post request body.
 pub fn generate_post_response<'t>(request: &mut HttpRequest, headers: BTreeMap::<String, String>, root_dir: &str) -> Option<HttpResponse<'t>> {
     let raw_length = match request.headers.get("Content-Length") {
         Some(i) => i,

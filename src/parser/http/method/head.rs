@@ -3,6 +3,12 @@ use std::collections::BTreeMap;
 
 use super::super::*;
 
+/// Generate HttpResponse for HEAD method
+/// 
+/// Some final work is done by `handle_connection`
+/// 
+/// * Return `Some(HttpResponse)` if a http response is required.
+/// * Return `None` will close the TCP link or do nothing.
 pub fn generate_head_response<'t>(request: &mut HttpRequest, mut headers: BTreeMap::<String, String>, root_dir: &str) -> Option<HttpResponse<'t>> {
     // almost the same as GET
     // check if requsested resource exists

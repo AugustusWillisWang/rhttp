@@ -5,6 +5,15 @@ use super::super::*;
 
 // use super::utils::chunk::*;
 
+/// Generate HttpResponse for POST method
+/// 
+/// Some final work is done by `handle_connection`.
+/// 
+/// Binary file read is done by `handle_connection`,
+/// for `String` can not deal with binary file. (will lead to data damage)
+///
+/// * Return `Some(HttpResponse)` if a http response is required.
+/// * Return `None` will close the TCP link or do nothing.
 pub fn generate_get_response<'t>(request: &mut HttpRequest, mut headers: BTreeMap::<String, String>, root_dir: &str) -> Option<HttpResponse<'t>> {
     // Sending body/payload in a GET request may cause some existing
     // implementations to reject the request — while not prohibited 
