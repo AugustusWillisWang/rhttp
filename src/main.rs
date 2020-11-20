@@ -114,6 +114,9 @@ pub use parser::http::*; // import http head data structure
 
 use parser::http::method::utils::chunk::*;
 
+use openssl::ssl::{SslMethod, SslAcceptor, SslStream, SslFiletype};
+use std::sync::Arc;
+
 // use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use structopt::StructOpt;
 extern crate confy;
@@ -124,7 +127,8 @@ extern crate serde;
 /// Request buffer size
 pub const BUFFER_SIZE: usize = 32768;
 /// Default page root path
-pub const DEFAULT_ROOT: &str = "/mnt/c/Workpath/rhttp/page";
+// pub const DEFAULT_ROOT: &str = "/mnt/c/Workpath/rhttp/page";
+pub const DEFAULT_ROOT: &str = "/home/lfz/Videos/rhttp/page";
 
 /// Global config file, shared by all threads
 #[derive(Debug, Serialize, Deserialize)]
@@ -206,6 +210,13 @@ fn main() {
     }
     println!("{:#?}", cfg);
 
+    // certificate loading
+    let mut acceptor = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
+    acceptor.set_private_key_file(format!("{}/test2020.com_key.key", cfg.root_dir), SslFiletype::PEM).unwrap();
+    acceptor.set_certificate_chain_file(format!("{}/test2020.com_chain.crt", cfg.root_dir)).unwrap();
+    acceptor.check_private_key().unwrap();
+    let acceptor = Arc::new(acceptor.build());
+
     // prepare TCP port and thread pool
     let listener = TcpListener::bind(format!("127.0.0.1:{}", cfg.port)).unwrap();
     let pool = ThreadPool::new(cfg.thread_number);
@@ -213,12 +224,18 @@ fn main() {
     // when new TCP request incomes, handle_connection
     loop {
         for stream in listener.incoming().take(2) {
-            let stream = stream.unwrap();
-            let root_dir = cfg.root_dir.clone();
-            let timeout = cfg.timeout as u64;
-            pool.execute(move || {
-                handle_connection(stream, &root_dir, timeout);
-            });
+            match stream {
+                Ok(stream) => {
+                    let acceptor = acceptor.clone();
+                    let stream = acceptor.accept(stream).unwrap();
+                    let root_dir = cfg.root_dir.clone();
+                    let timeout = cfg.timeout as u64;
+                    pool.execute(move || {
+                        handle_connection(stream, &root_dir, timeout);
+                    });
+                }
+                Err(_e) => { /* connection failed */ }
+            }
         }
     }
     
@@ -231,7 +248,7 @@ fn main() {
 /// When a new TCP link established, give it to handle_connection in a free worker.
 /// 
 /// Returning from this function will close TCP link.
-fn handle_connection(mut stream: TcpStream, root_dir: &str, timeout: u64) {
+fn handle_connection(mut stream: SslStream<TcpStream>, root_dir: &str, timeout: u64) {
     loop{
         let mut buffer = [0; BUFFER_SIZE];
         match stream.read(&mut buffer) {
@@ -307,7 +324,7 @@ fn handle_connection(mut stream: TcpStream, root_dir: &str, timeout: u64) {
                     // TODO
 
                     // otherwise, setup tcp timeout and wait
-                    stream.set_read_timeout(Some(std::time::Duration::new(timeout, 0))).unwrap();
+                    stream.get_ref().set_read_timeout(Some(std::time::Duration::new(timeout, 0))).unwrap();
                 }
             }
             _ => return // TCP will also be closed
