@@ -65,9 +65,6 @@ pub fn generate_get_response<'t>(request: &mut HttpRequest, mut headers: BTreeMa
                     //         body: Some(string_to_chunk(&body)),
                     //     })
                     // } else {
-            if !chunked {
-                headers.insert("Content-Length".to_string(), content_length.to_string());
-            }
             return Some( HttpResponse { // chunklize was moved outsize
                 status_code: 200,
                 status_text: "OK",

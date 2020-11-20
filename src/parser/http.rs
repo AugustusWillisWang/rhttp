@@ -251,7 +251,9 @@ impl HttpResponse<'_> {
         self.body == None
     }
 
-    /// Generate real HTTP response from HttpResponse 
+    /// Generate real HTTP response from HttpResponse
+    /// 
+    /// Outdated
     pub fn generate_string(&self) -> String {
         let status_line = format!("HTTP/1.1 {} {}\n", self.status_code, self.status_text);
         let mut headers_str = String::new();
@@ -268,6 +270,20 @@ impl HttpResponse<'_> {
                 // read file later
             }
         }
+    }
+
+    /// Generate real HTTP response head from HttpResponse
+    /// 
+    /// Body part can be Vec<u8>, not compatible with String (UTF-8 only),
+    /// so we need to deal with body part differently
+    pub fn generate_head_string(&self) -> String {
+        let status_line = format!("HTTP/1.1 {} {}\n", self.status_code, self.status_text);
+        let mut headers_str = String::new();
+        for (k, v) in &self.headers {
+            headers_str.push_str(&format!("{}: {}\n", k, v));
+        }
+        headers_str.push('\n'); // add a space line
+        String::from(format!("{}{}", status_line, headers_str))
     }
 }
 

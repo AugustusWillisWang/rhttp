@@ -10,7 +10,7 @@ use crate::Config;
 /// 
 /// * Return `Some(HttpResponse)` if a http response is required.
 /// * Return `None` will close the TCP link or do nothing.
-pub fn generate_head_response<'t>(request: &mut HttpRequest, mut headers: BTreeMap::<String, String>, cfg: &Config) -> Option<HttpResponse<'t>> {
+pub fn generate_head_response<'t>(request: &mut HttpRequest, headers: BTreeMap::<String, String>, cfg: &Config) -> Option<HttpResponse<'t>> {
     let root_dir: &str = &cfg.root_dir;
 
     // almost the same as GET
@@ -24,7 +24,6 @@ pub fn generate_head_response<'t>(request: &mut HttpRequest, mut headers: BTreeM
         // if resource exists, return 200
         Ok(_) => {
             let body = fs::read_to_string(&filename).unwrap();
-            headers.insert("Content-Length".to_string(), body.chars().count().to_string());
             return Some( HttpResponse {
                 status_code: 200,
                 status_text: "OK",
@@ -35,7 +34,6 @@ pub fn generate_head_response<'t>(request: &mut HttpRequest, mut headers: BTreeM
         // if resource dose not exist, return 404
         _ => {
             let body = fs::read_to_string(format!("{}/error/404.html", root_dir)).unwrap();
-            headers.insert("Content-Length".to_string(), body.chars().count().to_string());
             return Some( HttpResponse {
                 status_code: 404,
                 status_text: "NOT FOUND",

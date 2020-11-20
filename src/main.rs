@@ -105,6 +105,7 @@ use std::net::TcpListener;
 use std::net::TcpStream;
 // use std::thread;
 // use std::time::Duration;
+// use std::rc::Rc;
 
 pub mod tpool;
 pub use tpool::*;
@@ -137,7 +138,7 @@ pub struct Config {
     root_dir: String, 
     /// timeout unit: secs
     timeout: i64, 
-    /// enable chunk
+    /// enable chunk resp, chunk req is always supported
     chunk: bool, 
 }
 
@@ -284,23 +285,35 @@ fn handle_connection(mut stream: TcpStream, cfg: Config) {
                     println!("keep_alive: {}", keep_alive);
                 }
                 println!("{}\n", response);
-                let resp_string = response.generate_string();
-                println!("resp content::\n{}\n", resp_string);
-                stream.write(resp_string.as_bytes()).unwrap();
-                if response.need_send_raw_file() {
+ 
+                // raw_resp_body :Vec<u8>
+                let raw_resp_body = if response.need_send_raw_file() {
                     let filename = format!("{}/{}", root_dir, request.url);
                     match std::fs::read(filename) {
                         Ok(i) => {
-                            // stream.write(&vec_to_chunk(&i)).unwrap();
-                            stream.write(&i).unwrap();
-                            println!("--raw file omited--")
+                            println!("sending binary file");
+                            response.headers.insert("Content-Length".to_string(), i.len().to_string());
+                            i
                         },
                         Err(_) => {
                             // File may be removed by other threads, just ignore it or return
+                            println!("fail to re-read binary file");
                             return
                         } 
                     }
-                }
+                } else {
+                    let res = response.body.as_ref().unwrap().clone().into_bytes(); // FIXME: copy, perf loss
+                    // calculate raw body len
+                    response.headers.insert("Content-Length".to_string(), res.len().to_string());
+                    res
+                };
+
+                // generate final headers
+                let resp_string = response.generate_head_string();
+
+                println!("resp content head:\n{}\n", resp_string);
+                stream.write(resp_string.as_bytes()).unwrap();
+                stream.write(&raw_resp_body).unwrap();
                 stream.flush().unwrap();
                 println!("response send at {}.", std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH).unwrap().as_secs());
                 if !keep_alive {
