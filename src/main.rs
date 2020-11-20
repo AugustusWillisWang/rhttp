@@ -144,7 +144,7 @@ impl Default for Config {
         port: 7878,
         thread_number: 4,
         root_dir: DEFAULT_ROOT.into(),
-        timeout: 4,
+        timeout: 1,
     } }
 }
 
@@ -328,7 +328,7 @@ mod tests {
     /// For example:
     /// 
     /// ```
-    /// cargo test -- --nocapture --test <get_test>
+    /// cargo test -- --nocapture --test post_test
     /// ```
     
     use super::*;
@@ -394,11 +394,11 @@ mod tests {
     fn post_test () {
         let raw_req = 
         r"POST /contact_form.php HTTP/1.1
-        Host: developer.mozilla.org
-        Content-Length: 64
-        Content-Type: application/x-www-form-urlencoded
+Host: developer.mozilla.org
+Content-Length: 64
+Content-Type: application/x-www-form-urlencoded
         
-        name=Joe%20User&request=Send%20me%20one%20of%20your%20catalogue
+name=Joe%20User&request=Send%20me%20one%20of%20your%20catalogue
         ";
         let raw_resp = resp_from_req_str(&raw_req);
         println!("-----\n{}\n-----\n", raw_resp);
