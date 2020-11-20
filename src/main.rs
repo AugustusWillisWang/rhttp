@@ -217,7 +217,7 @@ fn handle_connection(mut stream: TcpStream, root_dir: &str, timeout: u64) {
                 if let Some(resp_keep_alive) = response.headers.get("Connection") {
                     keep_alive = resp_keep_alive.to_lowercase() == "keep-alive";
                 } else {
-                    let connection_value = if keep_alive { "keep_alive" } else { "close" };
+                    let connection_value = if keep_alive { "keep-alive" } else { "close" };
                     response.headers.insert("Connection".to_string(), connection_value.to_string());
                     println!("keep_alive: {}", keep_alive);
                 }
@@ -290,8 +290,8 @@ mod tests {
                 return response.generate_string()
             }
             _ => {
-                return "ERROR".to_string()
-                // panic!("server rejected to generate response, tcp cloned")
+                panic!("server rejected to generate response, tcp cloned");
+                // return "ERROR".to_string()
             }
         }
     }
@@ -314,6 +314,20 @@ Accept-Language: fr
 Host: developer.mozilla.org
 Content-Length: 64
 Content-Type: application/x-www-form-urlencoded
+
+name=Joe%20User&request=Send%20me%20one%20of%20your%20catalogue
+";
+        let raw_resp = resp_from_req_str(&raw_req);
+        println!("-----\n{}\n-----\n", raw_resp);
+    }
+
+    #[test]
+    fn post_file_test () {
+        let raw_req = 
+    r"POST /data_tobe_send.txt HTTP/1.1
+Host: developer.mozilla.org
+Content-Length: 64
+Content-Type: text/plain
 
 name=Joe%20User&request=Send%20me%20one%20of%20your%20catalogue
 ";

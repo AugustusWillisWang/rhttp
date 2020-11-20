@@ -30,6 +30,7 @@ pub fn generate_get_response<'t>(request: &mut HttpRequest, mut headers: BTreeMa
             let body = fs::read_to_string(&filename).unwrap();
             let content_length = body.chars().count();
             headers.insert("Content-Length".to_string(), content_length.to_string());
+            // println!("{}", body);
 
             // chunk resp is not enabled by default 
             let chunked = false;
