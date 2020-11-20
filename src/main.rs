@@ -56,21 +56,21 @@
 //!     * POST [DONE]
 //!     * HEAD [DONE]
 //!     * OPTIONS [DONE]
-//! * 实现Test框架
-//!     * 检查各种方法的实现
-//!     * 检查多线程的实现
+//! * 实现Test框架 [DONE]
+//!     * 检查各种方法的实现 [DONE]
+//!     * 检查多线程的实现 [DONE]
 //!     * RUST使用TCP发送数据可参考: https://blog.csdn.net/lcloveyou/article/details/105755676
 //! * 详细实现POST方法中对Content-Type的支持: 支持使用POST传输文件: [DONE] 
 //!     * ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
 //!     * multipart/form-data [DONE]
 //!     * 文件传输测试 [DONE]
-//! * 分块传输支持 [UPDATE NEEDED]
+//! * 分块传输支持 [MORE TEST NEEDED]
 //!     * ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Transfer-Encoding
 //!     * 分块传输解析 [DONE]
 //!         * Transfer-Encoding: chunked [DONE]
 //! * Keep-alive [DONE]
 //! * Pipelined
-//! * HTTPS
+//! * HTTPS [DONE] (incompatible with HTTP)
 
 /// 要求列表
 /// * HTTP Get [DONE]
@@ -305,6 +305,7 @@ fn handle_connection(mut stream: SslStream<TcpStream>, cfg: Config) {
                 println!("{}\n", response);
  
                 // raw_resp_body :Vec<u8>
+                // TODO: enable chunk resp (15 mins of work?)
                 let raw_resp_body = if response.need_send_raw_file() {
                     let filename = format!("{}/{}", root_dir, request.url);
                     match std::fs::read(filename) {
